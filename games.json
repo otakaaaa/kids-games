@@ -1,0 +1,16 @@
+{
+  "_メモ": "新しいゲームを追加するときは games の中に { } をひとつ足してください。上にあるものほど左上に並びます。",
+  "_つかえるicon": "flower / heart / star / candy / paint / music / puzzle / ball / cake / rocket / cat / rainbow",
+  "_つかえるcolor": "pink / mint / lemon / sky / lilac / peach",
+
+  "games": [
+    {
+      "title": "おはなあつめ",
+      "subtitle": "ももちゃんと おはなを あつめよう",
+      "folder": "ohana-atsume",
+      "icon": "flower",
+      "color": "pink",
+      "hidden": false
+    }
+  ]
+}

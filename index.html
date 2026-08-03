@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="あそぼう">
+<meta name="theme-color" content="#fff4fa">
+<meta name="robots" content="noindex, nofollow, noarchive">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" href="apple-touch-icon.png">
+<title>あそぼう！</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html, body {
+    min-height:100%; background:#fff4fa; overscroll-behavior:none;
+    font-family:"Hiragino Maru Gothic ProN","ヒラギノ丸ゴ ProN","Rounded Mplus 1c",sans-serif;
+    user-select:none; -webkit-user-select:none; -webkit-text-size-adjust:100%;
+  }
+  body {
+    padding: max(18px, env(safe-area-inset-top)) 18px calc(28px + env(safe-area-inset-bottom));
+    background-image:
+      radial-gradient(circle at 12% 18%, #ffe4f2 0 22%, transparent 22.5%),
+      radial-gradient(circle at 88% 8%,  #e6f5ff 0 18%, transparent 18.5%),
+      radial-gradient(circle at 78% 82%, #fff6d9 0 20%, transparent 20.5%);
+    background-attachment: fixed;
+  }
+
+  header { display:flex; align-items:center; justify-content:center; gap:10px; margin-bottom:22px; }
+  #mascot { width:clamp(64px,17vw,104px); height:clamp(64px,17vw,104px); flex:none; }
+  h1 {
+    font-size:clamp(28px,8vw,54px); color:#e0518c; font-weight:900; letter-spacing:.02em;
+    text-shadow:0 3px 0 #fff, 0 5px 10px rgba(224,81,140,.2);
+  }
+
+  .grid {
+    display:grid; gap:clamp(12px,3.5vw,22px);
+    grid-template-columns:repeat(auto-fill, minmax(clamp(132px,40vw,190px), 1fr));
+    max-width:960px; margin:0 auto;
+  }
+
+  .card {
+    display:block; text-decoration:none; border-radius:26px; padding:14px 12px 16px;
+    border:5px solid; background:#fff; text-align:center; cursor:pointer;
+    transition:transform .12s ease, box-shadow .12s ease;
+  }
+  .card:active { transform:scale(.94); }
+  .card .art {
+    aspect-ratio:1/1; border-radius:20px; display:flex; align-items:center; justify-content:center;
+    margin-bottom:10px;
+  }
+  .card .art svg { width:66%; height:66%; overflow:visible; }
+  .card .t { font-size:clamp(16px,4.6vw,24px); font-weight:900; line-height:1.3; }
+  .card .s { font-size:clamp(11px,3vw,14px); margin-top:4px; opacity:.75; line-height:1.35; }
+
+  .soon { border-style:dashed; opacity:.62; }
+  .soon .art { background:#f2f2f5; }
+  .soon .t, .soon .s { color:#9b93a6; }
+
+  .msg { text-align:center; color:#b3487a; font-size:clamp(15px,4vw,20px); padding:40px 20px; line-height:1.8; }
+  .hint { text-align:center; color:#c9a8bb; font-size:clamp(10px,2.8vw,13px); margin-top:26px; line-height:1.7; }
+</style>
+</head>
+<body>
+
+<header>
+  <canvas id="mascot" width="240" height="240"></canvas>
+  <h1>あそぼう！</h1>
+</header>
+
+<div class="grid" id="grid"></div>
+<div class="hint" id="hint"></div>
+
+<script>
+(function () {
+  "use strict";
+
+  /* ============ いろ の せってい ============ */
+  const THEMES = {
+    pink:   { bg:"#ffe3f1", border:"#ff9ecb", text:"#d6407f", ink:"#ff7ab5" },
+    mint:   { bg:"#ddf6ea", border:"#84dcb4", text:"#219166", ink:"#4cc794" },
+    lemon:  { bg:"#fff3cf", border:"#ffd45c", text:"#b3820c", ink:"#f5b921" },
+    sky:    { bg:"#dcefff", border:"#87c5f5", text:"#2074b8", ink:"#4ba3e8" },
+    lilac:  { bg:"#eee4ff", border:"#b79cf0", text:"#6f47c4", ink:"#9a77e6" },
+    peach:  { bg:"#ffe6dc", border:"#ffab8a", text:"#cf5f37", ink:"#ff9269" }
+  };
+
+  /* ============ アイコン（SVG） ============ */
+  const ICONS = {
+    flower: c => {
+      let p = "";
+      for (let i = 0; i < 6; i++) {
+        const a = (i / 6) * 360;
+        p += `<ellipse cx="50" cy="26" rx="13" ry="20" fill="${c.ink}" transform="rotate(${a} 50 50)"/>`;
+      }
+      return p + `<circle cx="50" cy="50" r="12" fill="#fff8dc"/><circle cx="50" cy="50" r="12" fill="none" stroke="${c.text}" stroke-width="3"/>`;
+    },
+    heart: c => `<path d="M50 84C10 56 18 22 50 34C82 22 90 56 50 84Z" fill="${c.ink}" stroke="${c.text}" stroke-width="4" stroke-linejoin="round"/>`,
+    star: c => `<path d="M50 10 61 38 92 40 68 60 76 90 50 73 24 90 32 60 8 40 39 38Z" fill="${c.ink}" stroke="${c.text}" stroke-width="4" stroke-linejoin="round"/>`,
+    candy: c => `<circle cx="50" cy="50" r="24" fill="${c.ink}" stroke="${c.text}" stroke-width="4"/><path d="M50 26a24 24 0 0 0-17 41" fill="none" stroke="#fff" stroke-width="7" stroke-linecap="round"/><path d="M74 50 94 34v32ZM26 50 6 34v32Z" fill="${c.ink}" stroke="${c.text}" stroke-width="4" stroke-linejoin="round"/>`,
+    paint: c => `<path d="M50 14c22 0 38 15 38 32 0 12-11 14-18 14-6 0-10 3-10 8 0 6 5 7 5 12 0 4-6 6-15 6-22 0-38-16-38-36S28 14 50 14Z" fill="${c.ink}" stroke="${c.text}" stroke-width="4"/><circle cx="35" cy="38" r="6" fill="#fff"/><circle cx="58" cy="32" r="6" fill="#fff"/><circle cx="28" cy="60" r="6" fill="#fff"/>`,
+    music: c => `<path d="M40 70V22l34-8v48" fill="none" stroke="${c.text}" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/><ellipse cx="30" cy="72" rx="13" ry="10" fill="${c.ink}" stroke="${c.text}" stroke-width="4"/><ellipse cx="64" cy="62" rx="13" ry="10" fill="${c.ink}" stroke="${c.text}" stroke-width="4"/>`,
+    puzzle: c => `<path d="M18 22h24a8 8 0 1 1 16 0h24v24a8 8 0 1 0 0 16v24H58a8 8 0 1 0-16 0H18V62a8 8 0 1 1 0-16Z" fill="${c.ink}" stroke="${c.text}" stroke-width="4" stroke-linejoin="round"/>`,
+    ball: c => `<circle cx="50" cy="50" r="34" fill="${c.ink}" stroke="${c.text}" stroke-width="4"/><path d="M16 50h68M50 16v68" stroke="#fff" stroke-width="6"/><circle cx="50" cy="50" r="10" fill="#fff"/>`,
+    cake: c => `<path d="M22 52h56v28H22Z" fill="${c.ink}" stroke="${c.text}" stroke-width="4" stroke-linejoin="round"/><path d="M22 52c6 8 12 8 18 0s12-8 18 0 12 8 20 0" fill="#fff" stroke="${c.text}" stroke-width="4" stroke-linejoin="round"/><path d="M50 40V26" stroke="${c.text}" stroke-width="5" stroke-linecap="round"/><circle cx="50" cy="20" r="7" fill="#ffd45c" stroke="${c.text}" stroke-width="3"/>`,
+    rocket: c => `<path d="M50 10c16 12 22 30 22 46l-10 12H38L28 56c0-16 6-34 22-46Z" fill="${c.ink}" stroke="${c.text}" stroke-width="4" stroke-linejoin="round"/><circle cx="50" cy="42" r="9" fill="#fff" stroke="${c.text}" stroke-width="3"/><path d="M38 68l-8 18 14-6ZM62 68l8 18-14-6Z" fill="${c.text}"/>`,
+    cat: c => `<path d="M22 40 18 14l22 12ZM78 40 82 14 60 26Z" fill="${c.ink}" stroke="${c.text}" stroke-width="4" stroke-linejoin="round"/><ellipse cx="50" cy="56" rx="32" ry="28" fill="${c.ink}" stroke="${c.text}" stroke-width="4"/><circle cx="38" cy="52" r="4.5" fill="${c.text}"/><circle cx="62" cy="52" r="4.5" fill="${c.text}"/><path d="M44 66q6 6 12 0" fill="none" stroke="${c.text}" stroke-width="4" stroke-linecap="round"/>`,
+    rainbow: c => `<path d="M12 74a38 38 0 0 1 76 0" fill="none" stroke="${c.ink}" stroke-width="11"/><path d="M25 74a25 25 0 0 1 50 0" fill="none" stroke="#ffd45c" stroke-width="11"/><path d="M38 74a12 12 0 0 1 24 0" fill="none" stroke="#87c5f5" stroke-width="11"/>`
+  };
+
+  /* ============ マスコット（ももちゃん） ============ */
+  const mc = document.getElementById("mascot").getContext("2d");
+  function drawMomo(g, cx, cy, s, t) {
+    g.save(); g.translate(cx, cy); g.rotate(Math.sin(t / 500) * 0.06); g.scale(s / 100, s / 100);
+    const PINK = "#ff9ecb", PINK_D = "#f472ad", CREAM = "#fff6fa";
+    [-1, 1].forEach(dir => {
+      g.save(); g.translate(dir * 17, -22); g.rotate(dir * (0.3 + Math.sin(t / 420 + dir) * 0.07));
+      g.fillStyle = CREAM; g.strokeStyle = PINK_D; g.lineWidth = 3;
+      g.beginPath(); g.ellipse(0, -26, 9.5, 30, 0, 0, Math.PI * 2); g.fill(); g.stroke();
+      g.fillStyle = "#ffc9e2"; g.beginPath(); g.ellipse(0, -26, 4.5, 22, 0, 0, Math.PI * 2); g.fill();
+      g.restore();
+    });
+    g.fillStyle = CREAM; g.strokeStyle = PINK_D; g.lineWidth = 3;
+    g.beginPath(); g.ellipse(0, 0, 28, 25, 0, 0, Math.PI * 2); g.fill(); g.stroke();
+    g.fillStyle = PINK; g.strokeStyle = PINK_D;
+    g.beginPath(); g.moveTo(-30, 2); g.bezierCurveTo(-34, -26, -18, -38, 0, -38);
+    g.bezierCurveTo(18, -38, 34, -26, 30, 2); g.bezierCurveTo(20, -8, -20, -8, -30, 2);
+    g.closePath(); g.fill(); g.stroke();
+    g.fillStyle = "#ffd0e6"; g.beginPath(); g.moveTo(-30, 2);
+    g.bezierCurveTo(-20, -8, 20, -8, 30, 2); g.bezierCurveTo(20, -1, -20, -1, -30, 2);
+    g.closePath(); g.fill();
+    const blink = (t % 4200 < 150) ? 0.12 : 1;
+    [-10, 10].forEach(dx => {
+      g.fillStyle = "#4a3040"; g.save(); g.translate(dx, -2); g.scale(1, blink);
+      g.beginPath(); g.ellipse(0, 0, 3.6, 5.2, 0, 0, Math.PI * 2); g.fill(); g.restore();
+      if (blink > 0.5) { g.fillStyle = "#fff"; g.beginPath(); g.arc(dx + 1.3, -4, 1.5, 0, Math.PI * 2); g.fill(); }
+    });
+    g.fillStyle = "rgba(255,150,190,.55)";
+    g.beginPath(); g.ellipse(-18, 6, 5.5, 3.6, 0, 0, Math.PI * 2); g.fill();
+    g.beginPath(); g.ellipse(18, 6, 5.5, 3.6, 0, 0, Math.PI * 2); g.fill();
+    g.strokeStyle = "#c96f9b"; g.lineWidth = 2; g.lineCap = "round";
+    g.beginPath(); g.arc(0, 7, 5, 0.15 * Math.PI, 0.85 * Math.PI); g.stroke();
+    g.restore();
+  }
+  (function mascotLoop(t) {
+    mc.clearRect(0, 0, 240, 240);
+    drawMomo(mc, 120, 140, 170, t);
+    requestAnimationFrame(mascotLoop);
+  })(0);
+
+  /* ============ ゲーム いちらん を よみこむ ============ */
+  const FALLBACK = [{ title: "おはなあつめ", subtitle: "ももちゃんと おはなを あつめよう", folder: "ohana-atsume", icon: "flower", color: "pink" }];
+
+  const grid = document.getElementById("grid");
+  const hint = document.getElementById("hint");
+
+  function render(games, offline) {
+    grid.innerHTML = "";
+    const list = games.filter(g => !g.hidden);
+
+    for (const g of list) {
+      const c = THEMES[g.color] || THEMES.pink;
+      const icon = ICONS[g.icon] || ICONS.star;
+      const a = document.createElement("a");
+      a.className = "card";
+      a.href = g.folder.replace(/\/*$/, "/");
+      a.style.borderColor = c.border;
+      a.innerHTML =
+        '<div class="art" style="background:' + c.bg + '">' +
+        '<svg viewBox="0 0 100 100">' + icon(c) + '</svg></div>' +
+        '<div class="t" style="color:' + c.text + '">' + esc(g.title) + '</div>' +
+        (g.subtitle ? '<div class="s" style="color:' + c.text + '">' + esc(g.subtitle) + '</div>' : '');
+      grid.appendChild(a);
+    }
+
+    // グリッドが さみしくないように「じゅんびちゅう」を ならべる
+    const fill = Math.max(0, (list.length < 4 ? 4 : 0) - list.length);
+    for (let i = 0; i < fill; i++) {
+      const d = document.createElement("div");
+      d.className = "card soon";
+      d.innerHTML = '<div class="art"><svg viewBox="0 0 100 100">' +
+        '<circle cx="50" cy="50" r="30" fill="none" stroke="#cfc9d6" stroke-width="5" stroke-dasharray="9 9"/>' +
+        '<path d="M50 62v-6c0-6 8-7 8-14a8 8 0 1 0-16 0" fill="none" stroke="#cfc9d6" stroke-width="5" stroke-linecap="round"/>' +
+        '<circle cx="50" cy="72" r="3.5" fill="#cfc9d6"/></svg></div>' +
+        '<div class="t">じゅんび<br>ちゅう</div>';
+      grid.appendChild(d);
+    }
+
+    hint.innerHTML = offline
+      ? "games.json が よみこめなかったので かりの いちらんを ひょうじしています。<br>（この がめんは サーバーに おいて ひらいてください）"
+      : "あそぶ ゲームを タップしてね";
+  }
+
+  function esc(s) {
+    return String(s).replace(/[&<>"]/g, m => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[m]));
+  }
+
+  fetch("games.json", { cache: "no-cache" })
+    .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
+    .then(d => render(Array.isArray(d) ? d : (d.games || []), false))
+    .catch(err => { console.warn("games.json を よみこめません:", err); render(FALLBACK, true); });
+})();
+</script>
+</body>
+</html>

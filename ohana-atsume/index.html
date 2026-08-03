@@ -1,0 +1,619 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="おはなあつめ">
+<meta name="theme-color" content="#ffd9ea">
+<meta name="robots" content="noindex, nofollow, noarchive">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" href="apple-touch-icon.png">
+<title>ももちゃんの おはなあつめ</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html, body {
+    width:100%; height:100%; overflow:hidden; position:fixed;
+    touch-action:none; overscroll-behavior:none;
+    background:#ffd9ea;
+    font-family:"Hiragino Maru Gothic ProN","ヒラギノ丸ゴ ProN","Rounded Mplus 1c",sans-serif;
+    user-select:none; -webkit-user-select:none;
+  }
+  #game { display:block; width:100%; height:100%; }
+
+  .screen {
+    position:absolute; inset:0; display:flex; flex-direction:column;
+    align-items:center; justify-content:center; gap:4vh;
+    background:rgba(255,214,235,0.94); z-index:10; text-align:center;
+  }
+  .screen.hidden { display:none; }
+
+  .title {
+    font-size:clamp(28px, 8vw, 64px); color:#e0518c; font-weight:900;
+    text-shadow:0 3px 0 #fff, 0 6px 12px rgba(224,81,140,.25); line-height:1.4;
+  }
+  .subtitle { font-size:clamp(15px,4vw,24px); color:#b3487a; }
+
+  .bigbtn {
+    font-family:inherit; font-weight:900; border:none; cursor:pointer;
+    font-size:clamp(24px,7vw,44px); color:#fff;
+    background:linear-gradient(#ff8ec0,#f0559b);
+    padding:0.55em 1.5em; border-radius:999px;
+    box-shadow:0 8px 0 #d13d80, 0 12px 24px rgba(209,61,128,.35);
+    transition:transform .08s, box-shadow .08s;
+  }
+  .bigbtn:active { transform:translateY(6px); box-shadow:0 2px 0 #d13d80; }
+  .bigbtn.small { font-size:clamp(17px,4.8vw,28px); padding:0.5em 1em; }
+  .subrow { display:flex; gap:3vw; flex-wrap:wrap; justify-content:center; align-items:center; }
+
+  .smallbtn {
+    position:absolute; top:max(12px, env(safe-area-inset-top)); right:12px; z-index:5;
+    font-family:inherit; font-size:clamp(16px,4.5vw,26px); font-weight:900; color:#e0518c;
+    background:rgba(255,255,255,.85); border:3px solid #ffb3d5; border-radius:999px;
+    width:2.2em; height:2.2em; cursor:pointer; line-height:1;
+  }
+  .smallbtn:active { background:#ffe0ef; }
+
+  .credit { font-size:clamp(11px,3vw,15px); color:#c77aa0; margin-top:2vh; }
+
+  .speedbox { display:flex; flex-direction:column; align-items:center; gap:1.4vh; }
+  .speedlabel { font-size:clamp(13px,3.6vw,20px); color:#b3487a; font-weight:900; }
+  .speedrow { display:flex; gap:2.5vw; flex-wrap:wrap; justify-content:center; }
+  .speedbtn {
+    font-family:inherit; font-weight:900; cursor:pointer;
+    font-size:clamp(13px,3.6vw,20px); color:#c96f9b;
+    background:#fff; border:4px solid #ffc2de; border-radius:22px;
+    padding:0.5em 0.8em; line-height:1.2; min-width:4.2em;
+    display:flex; flex-direction:column; align-items:center; gap:3px;
+    transition:transform .1s, background .1s;
+  }
+  .speedbtn .icon { font-size:1.7em; line-height:1; }
+  .speedbtn.on {
+    color:#fff; background:linear-gradient(#ff8ec0,#f0559b);
+    border-color:#d13d80; transform:scale(1.1); box-shadow:0 4px 0 #d13d80;
+  }
+
+  /* ゲーム中の はやさボタン（画面 ひだりうえ・アイコンだけ） */
+  #speedToggle {
+    position:absolute; top:max(12px, env(safe-area-inset-top)); left:12px; z-index:5;
+    font-family:inherit; cursor:pointer; line-height:1;
+    font-size:clamp(16px,4.5vw,26px);
+    background:rgba(255,255,255,.85); border:3px solid #ffb3d5; border-radius:999px;
+    width:2.2em; height:2.2em; padding:0;
+    display:flex; align-items:center; justify-content:center;
+  }
+  #speedToggle:active { background:#ffe0ef; }
+  #speedToggle.hidden { display:none; }
+  #safeProbe { position:absolute; top:0; left:0; width:0; height:env(safe-area-inset-top,0px); pointer-events:none; }
+</style>
+</head>
+<body>
+
+<canvas id="game"></canvas>
+<button id="pauseBtn" class="smallbtn">॥</button>
+<button id="speedToggle" aria-label="おちる はやさ"><span id="speedToggleIcon">🐢</span></button>
+<div id="safeProbe"></div>
+
+<div id="startScreen" class="screen">
+  <canvas id="heroCanvas" width="300" height="300" style="width:min(46vw,220px);height:min(46vw,220px)"></canvas>
+  <div class="title">ももちゃんの<br>おはなあつめ</div>
+  <div class="subtitle">ゆびで ももちゃんを うごかしてね</div>
+
+  <div class="speedbox">
+    <div class="speedlabel">おはなが おちる はやさ</div>
+    <div class="speedrow" data-speedrow>
+      <button class="speedbtn" data-speed="0"><span class="icon">🐌</span>とても<br>ゆっくり</button>
+      <button class="speedbtn" data-speed="1"><span class="icon">🐢</span>ゆっくり</button>
+      <button class="speedbtn" data-speed="2"><span class="icon">🐰</span>ふつう</button>
+      <button class="speedbtn" data-speed="3"><span class="icon">🐆</span>はやい</button>
+    </div>
+  </div>
+
+  <button id="startBtn" class="bigbtn">はじめる</button>
+  <div class="credit">おうちのなかだけの ひみつのゲーム</div>
+</div>
+
+<div id="pauseScreen" class="screen hidden">
+  <div class="title">ちょっと おやすみ</div>
+  <div class="subtitle" id="pauseScore"></div>
+
+  <div class="speedbox">
+    <div class="speedlabel">おはなが おちる はやさ</div>
+    <div class="speedrow" data-speedrow>
+      <button class="speedbtn" data-speed="0"><span class="icon">🐌</span>とても<br>ゆっくり</button>
+      <button class="speedbtn" data-speed="1"><span class="icon">🐢</span>ゆっくり</button>
+      <button class="speedbtn" data-speed="2"><span class="icon">🐰</span>ふつう</button>
+      <button class="speedbtn" data-speed="3"><span class="icon">🐆</span>はやい</button>
+    </div>
+  </div>
+
+  <button id="resumeBtn" class="bigbtn">つづける</button>
+  <div class="subrow">
+    <button id="restartBtn" class="bigbtn small" style="background:linear-gradient(#b6e3ff,#66b8f0);box-shadow:0 6px 0 #4a97cc;">さいしょから</button>
+    <a id="homeBtn" class="bigbtn small" href="../" style="background:linear-gradient(#ffe07a,#f5bb2a);box-shadow:0 6px 0 #cf9508;text-decoration:none;display:inline-flex;align-items:center;gap:0.3em;">🏠 おうち</a>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  /* ============ セットアップ ============ */
+  const cv = document.getElementById("game");
+  const ctx = cv.getContext("2d");
+  let W = 0, H = 0, DPR = 1;
+  const FONT = '"Hiragino Maru Gothic ProN","ヒラギノ丸ゴ ProN",sans-serif';
+
+  // roundRect が ない ふるいブラウザ よう
+  if (!CanvasRenderingContext2D.prototype.roundRect) {
+    CanvasRenderingContext2D.prototype.roundRect = function (x, y, w, h, r) {
+      r = Math.min(r, w / 2, h / 2);
+      this.beginPath();
+      this.moveTo(x + r, y);
+      this.arcTo(x + w, y, x + w, y + h, r);
+      this.arcTo(x + w, y + h, x, y + h, r);
+      this.arcTo(x, y + h, x, y, r);
+      this.arcTo(x, y, x + w, y, r);
+      this.closePath();
+      return this;
+    };
+  }
+
+  function resize() {
+    DPR = Math.min(window.devicePixelRatio || 1, 2.5);
+    W = window.innerWidth; H = window.innerHeight;
+    cv.width = Math.floor(W * DPR); cv.height = Math.floor(H * DPR);
+    cv.style.width = W + "px"; cv.style.height = H + "px";
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    unit = Math.min(W, H) / 100;          // 画面サイズに応じた基準単位
+    const probe = document.getElementById("safeProbe");
+    safeTop = probe ? probe.offsetHeight : 0;   // ノッチぶんの よゆう
+    bunny.size = Math.max(52, Math.min(W * 0.22, H * 0.24, 130));
+    bunny.y = H - bunny.size * 0.62 - H * 0.06;
+    bunny.x = Math.min(Math.max(bunny.x || W / 2, bunny.size / 2), W - bunny.size / 2);
+    bunny.tx = bunny.x;
+  }
+  let unit = 5, safeTop = 0;
+
+  /* ============ おと（やさしいチャイム） ============ */
+  let ac = null;
+  function initAudio() {
+    if (!ac) { try { ac = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { ac = null; } }
+    if (ac && ac.state === "suspended") ac.resume();
+  }
+  function beep(freq, dur, vol, type) {
+    if (!ac || muted) return;
+    const o = ac.createOscillator(), g = ac.createGain();
+    o.type = type || "sine"; o.frequency.value = freq;
+    g.gain.setValueAtTime(0, ac.currentTime);
+    g.gain.linearRampToValueAtTime(vol, ac.currentTime + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, ac.currentTime + dur);
+    o.connect(g); g.connect(ac.destination);
+    o.start(); o.stop(ac.currentTime + dur + 0.05);
+  }
+  let muted = false;
+  function sCatch(n) { const scale = [523, 587, 659, 784, 880, 1047]; beep(scale[n % scale.length], 0.28, 0.16, "triangle"); }
+  function sCheer() { [523, 659, 784, 1047].forEach((f, i) => setTimeout(() => beep(f, 0.42, 0.16, "triangle"), i * 110)); }
+
+  /* ============ キャラクター描画（オリジナル） ============ */
+  // ももちゃん：ピンクのずきんをかぶった うさぎの女の子
+  function drawBunny(g, cx, cy, s, t, happy) {
+    g.save();
+    g.translate(cx, cy);
+    const wob = Math.sin(t / 260) * 0.05;     // ふわふわ揺れ
+    g.rotate(wob * 0.35);
+    g.scale(s / 100, s / 100);                // 100x100 基準で描く
+
+    const PINK = "#ff9ecb", PINK_D = "#f472ad", CREAM = "#fff6fa";
+
+    // --- からだ（うしろ） ---
+    g.fillStyle = CREAM; g.strokeStyle = PINK_D; g.lineWidth = 3;
+    g.beginPath(); g.ellipse(0, 30, 27, 24, 0, 0, Math.PI * 2); g.fill(); g.stroke();
+
+    // --- みみ（ずきんの中から） ---
+    for (const dir of [-1, 1]) {
+      g.save();
+      g.translate(dir * 17, -28);
+      g.rotate(dir * (0.32 + Math.sin(t / 300 + dir) * 0.06));
+      g.fillStyle = CREAM; g.strokeStyle = PINK_D; g.lineWidth = 3;
+      g.beginPath(); g.ellipse(0, -26, 9.5, 30, 0, 0, Math.PI * 2); g.fill(); g.stroke();
+      g.fillStyle = "#ffc9e2";
+      g.beginPath(); g.ellipse(0, -26, 4.5, 22, 0, 0, Math.PI * 2); g.fill();
+      g.restore();
+    }
+
+    // --- かお ---
+    g.fillStyle = CREAM; g.strokeStyle = PINK_D; g.lineWidth = 3;
+    g.beginPath(); g.ellipse(0, -8, 28, 25, 0, 0, Math.PI * 2); g.fill(); g.stroke();
+
+    // --- ずきん（フード） ---
+    g.fillStyle = PINK; g.strokeStyle = PINK_D; g.lineWidth = 3;
+    g.beginPath();
+    g.moveTo(-30, -6);
+    g.bezierCurveTo(-34, -34, -18, -46, 0, -46);
+    g.bezierCurveTo(18, -46, 34, -34, 30, -6);
+    g.bezierCurveTo(20, -16, -20, -16, -30, -6);
+    g.closePath(); g.fill(); g.stroke();
+    // ずきんのふち
+    g.fillStyle = "#ffd0e6";
+    g.beginPath();
+    g.moveTo(-30, -6); g.bezierCurveTo(-20, -16, 20, -16, 30, -6);
+    g.bezierCurveTo(20, -9, -20, -9, -30, -6);
+    g.closePath(); g.fill();
+
+    // --- ほっぺの おはな かざり ---
+    g.save(); g.translate(-24, -20); g.rotate(-0.3); g.scale(0.42, 0.42);
+    drawFlower(g, 0, 0, "#ffe066", "#fff");
+    g.restore();
+
+    // --- め ---
+    const blink = (t % 4200 < 150) ? 0.12 : 1;
+    g.fillStyle = "#4a3040";
+    for (const dx of [-10, 10]) {
+      g.save(); g.translate(dx, -10); g.scale(1, blink);
+      g.beginPath(); g.ellipse(0, 0, 3.6, 5.2, 0, 0, Math.PI * 2); g.fill();
+      g.restore();
+      if (blink > 0.5) { g.fillStyle = "#fff"; g.beginPath(); g.arc(dx + 1.3, -12, 1.5, 0, Math.PI * 2); g.fill(); g.fillStyle = "#4a3040"; }
+    }
+    // ほっぺ
+    g.fillStyle = "rgba(255,150,190,0.55)";
+    g.beginPath(); g.ellipse(-18, -2, 5.5, 3.6, 0, 0, Math.PI * 2); g.fill();
+    g.beginPath(); g.ellipse(18, -2, 5.5, 3.6, 0, 0, Math.PI * 2); g.fill();
+    // くち
+    g.strokeStyle = "#c96f9b"; g.lineWidth = 2; g.lineCap = "round";
+    g.beginPath();
+    if (happy) { g.arc(0, -1, 5, 0.15 * Math.PI, 0.85 * Math.PI); }
+    else { g.moveTo(-3.5, 0); g.quadraticCurveTo(0, 3, 3.5, 0); }
+    g.stroke();
+
+    // --- かご（バスケット） ---
+    g.fillStyle = "#e8a866"; g.strokeStyle = "#b9793f"; g.lineWidth = 3;
+    g.beginPath();
+    g.moveTo(-26, 22); g.lineTo(26, 22); g.lineTo(20, 48); g.lineTo(-20, 48);
+    g.closePath(); g.fill(); g.stroke();
+    g.strokeStyle = "rgba(185,121,63,.6)"; g.lineWidth = 1.6;
+    for (let i = 1; i < 4; i++) { const y = 22 + i * 6.5; g.beginPath(); g.moveTo(-26 + i * 1.5, y); g.lineTo(26 - i * 1.5, y); g.stroke(); }
+    // かごの もちて
+    g.strokeStyle = "#b9793f"; g.lineWidth = 3.5;
+    g.beginPath(); g.arc(0, 22, 18, Math.PI, 0); g.stroke();
+    // ふち
+    g.fillStyle = "#f3c489"; g.strokeStyle = "#b9793f"; g.lineWidth = 2.5;
+    g.beginPath(); g.roundRect(-29, 17, 58, 8, 4); g.fill(); g.stroke();
+
+    g.restore();
+  }
+
+  function drawFlower(g, x, y, petal, center) {
+    g.save(); g.translate(x, y);
+    g.fillStyle = petal;
+    for (let i = 0; i < 5; i++) {
+      g.save(); g.rotate((i / 5) * Math.PI * 2);
+      g.beginPath(); g.ellipse(0, -7, 4.6, 7, 0, 0, Math.PI * 2); g.fill();
+      g.restore();
+    }
+    g.fillStyle = center; g.beginPath(); g.arc(0, 0, 4, 0, Math.PI * 2); g.fill();
+    g.restore();
+  }
+
+  function drawHeart(g, x, y, color) {
+    g.save(); g.translate(x, y); g.fillStyle = color;
+    g.beginPath();
+    g.moveTo(0, 9);
+    g.bezierCurveTo(-13, 0, -9, -11, 0, -5);
+    g.bezierCurveTo(9, -11, 13, 0, 0, 9);
+    g.closePath(); g.fill(); g.restore();
+  }
+
+  function drawStar(g, x, y, color) {
+    g.save(); g.translate(x, y); g.fillStyle = color; g.beginPath();
+    for (let i = 0; i < 10; i++) {
+      const r = i % 2 ? 4.5 : 10.5, a = (i / 10) * Math.PI * 2 - Math.PI / 2;
+      i ? g.lineTo(Math.cos(a) * r, Math.sin(a) * r) : g.moveTo(Math.cos(a) * r, Math.sin(a) * r);
+    }
+    g.closePath(); g.fill(); g.restore();
+  }
+
+  function drawCandy(g, x, y, color) {
+    g.save(); g.translate(x, y);
+    g.fillStyle = color; g.beginPath(); g.arc(0, 0, 8, 0, Math.PI * 2); g.fill();
+    g.fillStyle = "rgba(255,255,255,.65)";
+    g.beginPath(); g.moveTo(-8, 3); g.lineTo(0, -7); g.lineTo(4, -6); g.lineTo(-6, 6); g.closePath(); g.fill();
+    g.fillStyle = color;
+    g.beginPath(); g.moveTo(8, 0); g.lineTo(15, -6); g.lineTo(15, 6); g.closePath(); g.fill();
+    g.beginPath(); g.moveTo(-8, 0); g.lineTo(-15, -6); g.lineTo(-15, 6); g.closePath(); g.fill();
+    g.restore();
+  }
+
+  /* ============ ゲーム状態 ============ */
+  const bunny = { x: 0, tx: 0, y: 0, size: 100, happy: 0 };
+  let items = [], sparkles = [], pops = [], clouds = [], garden = [];
+  let score = 0, level = 1, spawnTimer = 0, running = false, started = false;
+  let lastT = 0, gameT = 0, cheerT = 0, cheerMsg = "";
+
+  /* ---- おちる はやさ の せってい ---- */
+  const SPEEDS = [
+    { icon: "🐌", name: "とても\nゆっくり", short: "とてもゆっくり", mul: 0.55, gap: 1600 },
+    { icon: "🐢", name: "ゆっくり", short: "ゆっくり", mul: 1.00, gap: 1300 },
+    { icon: "🐰", name: "ふつう", short: "ふつう", mul: 1.60, gap: 1000 },
+    { icon: "🐆", name: "はやい", short: "はやい", mul: 2.40, gap: 800 }
+  ];
+  let speedIdx = 1;
+  try { const sv = localStorage.getItem("momo_speed"); if (sv !== null) speedIdx = Math.min(3, Math.max(0, parseInt(sv, 10) || 0)); } catch (e) {}
+
+  const COLORS = ["#ff8fc0", "#ffd166", "#a0e7a0", "#a6c8ff", "#e0a6ff", "#ffb3a0"];
+  const KINDS = ["flower", "flower", "flower", "heart", "star", "candy"];
+  const MSGS = ["すごい！", "じょうず！", "やったね！", "かわいい！", "だいせいこう！", "いっぱい！"];
+
+  function reset() {
+    items = []; sparkles = []; pops = []; garden = [];
+    score = 0; level = 1; spawnTimer = 0; gameT = 0; cheerT = 0;
+    bunny.x = bunny.tx = W / 2; bunny.happy = 0;
+    clouds = [];
+    for (let i = 0; i < 4; i++) clouds.push({ x: Math.random() * W, y: H * (0.08 + Math.random() * 0.28), s: 0.6 + Math.random() * 0.8, v: 0.1 + Math.random() * 0.15 });
+  }
+
+  function spawn() {
+    const kind = KINDS[Math.floor(Math.random() * KINDS.length)];
+    const m = Math.max(30, W * 0.08);
+    items.push({
+      x: m + Math.random() * (W - m * 2),
+      y: -40,
+      baseVy: (H / 1000) * (0.38 + Math.random() * 0.18 + Math.min(level, 8) * 0.022),
+      rot: Math.random() * Math.PI * 2,
+      vr: (Math.random() - 0.5) * 0.03,
+      sway: Math.random() * Math.PI * 2,
+      kind: kind,
+      color: COLORS[Math.floor(Math.random() * COLORS.length)],
+      size: unit * 3.4
+    });
+  }
+
+  function burst(x, y, color) {
+    for (let i = 0; i < 14; i++) {
+      const a = Math.random() * Math.PI * 2, sp = 1 + Math.random() * 3.5;
+      sparkles.push({ x: x, y: y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 1, life: 1, color: Math.random() < 0.4 ? "#fff" : color, r: 2 + Math.random() * 3 });
+    }
+  }
+
+  /* ============ こうしん ============ */
+  function update(dt) {
+    gameT += dt;
+
+    // ももちゃんが ゆびを おいかける
+    const lerp = 1 - Math.pow(0.001, dt / 1000);
+    bunny.x += (bunny.tx - bunny.x) * lerp;
+    if (bunny.happy > 0) bunny.happy -= dt;
+
+    // くも
+    for (const c of clouds) { c.x += c.v * dt * 0.03; if (c.x - 80 * c.s > W) { c.x = -80 * c.s; c.y = H * (0.06 + Math.random() * 0.3); } }
+
+    // おはなを だす
+    spawnTimer -= dt;
+    if (spawnTimer <= 0) { spawn(); spawnTimer = Math.max(SPEEDS[speedIdx].gap * 0.6, SPEEDS[speedIdx].gap - level * 40); }
+
+    // アイテム
+    const bx = bunny.x, by = bunny.y + bunny.size * 0.30, cr = bunny.size * 0.34;
+    for (let i = items.length - 1; i >= 0; i--) {
+      const it = items[i];
+      it.y += it.baseVy * SPEEDS[speedIdx].mul * dt; it.rot += it.vr * dt * 0.06; it.sway += dt * 0.003;
+      it.x += Math.sin(it.sway) * 0.35;
+
+      const dx = it.x - bx, dy = it.y - by;
+      if (Math.abs(dx) < cr + it.size * 0.5 && Math.abs(dy) < cr * 0.75 + it.size * 0.5) {
+        items.splice(i, 1);
+        score++; bunny.happy = 700;
+        burst(it.x, it.y, it.color);
+        pops.push({ x: it.x, y: it.y, life: 1, text: "+1", color: it.color });
+        sCatch(score);
+        garden.push({ color: it.color, x: Math.random(), y: Math.random() });
+        if (garden.length > 40) garden.shift();
+        if (score % 10 === 0) {
+          level++; cheerT = 2200; cheerMsg = MSGS[Math.floor(Math.random() * MSGS.length)];
+          sCheer();
+          for (let k = 0; k < 5; k++) setTimeout(() => burst(Math.random() * W, H * 0.3 + Math.random() * H * 0.3, COLORS[k % COLORS.length]), k * 90);
+        }
+        continue;
+      }
+      if (it.y > H + 60) items.splice(i, 1);   // 落としても ペナルティなし
+    }
+
+    for (let i = sparkles.length - 1; i >= 0; i--) {
+      const p = sparkles[i];
+      p.x += p.vx * dt * 0.06; p.y += p.vy * dt * 0.06; p.vy += dt * 0.012;
+      p.life -= dt / 800; if (p.life <= 0) sparkles.splice(i, 1);
+    }
+    for (let i = pops.length - 1; i >= 0; i--) {
+      const p = pops[i]; p.y -= dt * 0.05; p.life -= dt / 900;
+      if (p.life <= 0) pops.splice(i, 1);
+    }
+    if (cheerT > 0) cheerT -= dt;
+  }
+
+  /* ============ びょうが ============ */
+  function draw() {
+    // そら
+    const sky = ctx.createLinearGradient(0, 0, 0, H);
+    sky.addColorStop(0, "#ffe3f2"); sky.addColorStop(0.55, "#ffd0e8"); sky.addColorStop(1, "#ffeaf5");
+    ctx.fillStyle = sky; ctx.fillRect(0, 0, W, H);
+
+    // くも
+    ctx.fillStyle = "rgba(255,255,255,.75)";
+    for (const c of clouds) {
+      ctx.save(); ctx.translate(c.x, c.y); ctx.scale(c.s * unit * 0.12, c.s * unit * 0.12);
+      ctx.beginPath();
+      ctx.arc(-22, 0, 18, 0, Math.PI * 2); ctx.arc(0, -8, 24, 0, Math.PI * 2); ctx.arc(24, 2, 17, 0, Math.PI * 2);
+      ctx.fill(); ctx.restore();
+    }
+
+    // じめん
+    const gh = H * 0.13;
+    ctx.fillStyle = "#b6e59a"; ctx.beginPath();
+    ctx.moveTo(0, H - gh);
+    ctx.bezierCurveTo(W * 0.3, H - gh - unit * 2.5, W * 0.7, H - gh + unit * 2, W, H - gh - unit);
+    ctx.lineTo(W, H); ctx.lineTo(0, H); ctx.closePath(); ctx.fill();
+
+    // あつめた おはなの おにわ
+    garden.forEach((f, i) => {
+      const x = f.x * (W - unit * 8) + unit * 4;
+      const y = H - gh * (0.18 + f.y * 0.6);
+      ctx.save(); ctx.translate(x, y); ctx.scale(unit * 0.09, unit * 0.09);
+      ctx.strokeStyle = "#7cc45f"; ctx.lineWidth = 2.5;
+      ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(0, 14); ctx.stroke();
+      drawFlower(ctx, 0, 0, f.color, "#fff8dc");
+      ctx.restore();
+    });
+
+    // おちてくるもの
+    for (const it of items) {
+      ctx.save(); ctx.translate(it.x, it.y); ctx.rotate(it.rot); ctx.scale(it.size / 10, it.size / 10);
+      if (it.kind === "flower") drawFlower(ctx, 0, 0, it.color, "#fff8dc");
+      else if (it.kind === "heart") drawHeart(ctx, 0, 0, it.color);
+      else if (it.kind === "star") drawStar(ctx, 0, 0, it.color);
+      else drawCandy(ctx, 0, 0, it.color);
+      ctx.restore();
+    }
+
+    // ももちゃん
+    drawBunny(ctx, bunny.x, bunny.y, bunny.size, gameT, bunny.happy > 0);
+
+    // きらきら
+    for (const p of sparkles) {
+      ctx.globalAlpha = Math.max(0, p.life);
+      ctx.fillStyle = p.color;
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.r * unit * 0.22, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+
+    // +1
+    ctx.textAlign = "center"; ctx.font = "900 " + (unit * 4) + "px " + FONT;
+    for (const p of pops) {
+      ctx.globalAlpha = Math.max(0, p.life);
+      ctx.fillStyle = "#fff"; ctx.lineWidth = unit * 0.7; ctx.strokeStyle = p.color;
+      ctx.strokeText(p.text, p.x, p.y); ctx.fillText(p.text, p.x, p.y);
+    }
+    ctx.globalAlpha = 1;
+
+    // スコア（おはなの かず）— がめん うえ の まんなか。りょうはしの ボタンと かさならない
+    ctx.save();
+    ctx.font = "900 " + (unit * 7) + "px " + FONT;
+    const numW = ctx.measureText(String(score)).width;
+    const bw = Math.max(unit * 20, unit * 12 + numW);
+    const bh = unit * 11;
+    const px = (W - bw) / 2;
+    const py = safeTop + unit * 2.5;
+    ctx.fillStyle = "rgba(255,255,255,.88)";
+    ctx.beginPath(); ctx.roundRect(px, py, bw, bh, bh / 2); ctx.fill();
+    ctx.save(); ctx.translate(px + unit * 5.5, py + bh / 2); ctx.scale(unit * 0.32, unit * 0.32);
+    drawFlower(ctx, 0, 0, "#ff8fc0", "#fff8dc"); ctx.restore();
+    ctx.fillStyle = "#e0518c";
+    ctx.textAlign = "left"; ctx.textBaseline = "middle";
+    ctx.fillText(String(score), px + unit * 10.5, py + bh / 2 + unit * 0.3);
+    ctx.restore();
+
+    // おいわい
+    if (cheerT > 0) {
+      const a = Math.min(1, cheerT / 400);
+      const pop = 1 + Math.sin(Math.min(1, (2200 - cheerT) / 300) * Math.PI) * 0.25;
+      ctx.save(); ctx.globalAlpha = a;
+      ctx.translate(W / 2, H * 0.34); ctx.scale(pop, pop);
+      ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.font = "900 " + (unit * 11) + "px " + FONT;
+      ctx.lineWidth = unit * 1.6; ctx.strokeStyle = "#fff"; ctx.lineJoin = "round";
+      ctx.strokeText(cheerMsg, 0, 0);
+      const gr = ctx.createLinearGradient(0, -unit * 6, 0, unit * 6);
+      gr.addColorStop(0, "#ff9ecb"); gr.addColorStop(1, "#e0518c");
+      ctx.fillStyle = gr; ctx.fillText(cheerMsg, 0, 0);
+      ctx.restore();
+    }
+    ctx.textBaseline = "alphabetic";
+  }
+
+  function loop(t) {
+    const dt = Math.min(50, t - lastT || 16); lastT = t;
+    if (running) { update(dt); draw(); }
+    requestAnimationFrame(loop);
+  }
+
+  /* ============ そうさ ============ */
+  function moveTo(clientX) {
+    bunny.tx = Math.min(Math.max(clientX, bunny.size * 0.4), W - bunny.size * 0.4);
+  }
+  let pointerDown = false;
+  cv.addEventListener("pointerdown", e => { pointerDown = true; moveTo(e.clientX); e.preventDefault(); });
+  cv.addEventListener("pointermove", e => { if (pointerDown) moveTo(e.clientX); e.preventDefault(); });
+  window.addEventListener("pointerup", () => { pointerDown = false; });
+  window.addEventListener("pointercancel", () => { pointerDown = false; });
+  document.addEventListener("touchmove", e => e.preventDefault(), { passive: false });
+  document.addEventListener("gesturestart", e => e.preventDefault());
+  window.addEventListener("keydown", e => {
+    if (e.key === "ArrowLeft") bunny.tx = Math.max(bunny.size * 0.4, bunny.tx - W * 0.09);
+    if (e.key === "ArrowRight") bunny.tx = Math.min(W - bunny.size * 0.4, bunny.tx + W * 0.09);
+  });
+
+  /* ============ がめん きりかえ ============ */
+  const startScreen = document.getElementById("startScreen");
+  const pauseScreen = document.getElementById("pauseScreen");
+  const pauseScore = document.getElementById("pauseScore");
+  const speedToggle = document.getElementById("speedToggle");
+  const speedToggleIcon = document.getElementById("speedToggleIcon");
+
+  /* ---- はやさ の きりかえ ---- */
+  function applySpeed(i, sound) {
+    speedIdx = Math.min(SPEEDS.length - 1, Math.max(0, i));
+    try { localStorage.setItem("momo_speed", String(speedIdx)); } catch (e) {}
+    document.querySelectorAll(".speedbtn").forEach(b => {
+      b.classList.toggle("on", parseInt(b.dataset.speed, 10) === speedIdx);
+    });
+    speedToggleIcon.textContent = SPEEDS[speedIdx].icon;
+    if (sound) beep(440 + speedIdx * 90, 0.15, 0.12, "triangle");
+  }
+  document.querySelectorAll(".speedbtn").forEach(b => {
+    b.addEventListener("click", () => { initAudio(); applySpeed(parseInt(b.dataset.speed, 10), true); });
+  });
+  // ゲーム中は タップで つぎの はやさへ（とてもゆっくり→…→はやい→とてもゆっくり）
+  speedToggle.addEventListener("click", e => {
+    e.stopPropagation();
+    applySpeed((speedIdx + 1) % SPEEDS.length, true);
+  });
+  applySpeed(speedIdx, false);
+
+  function showHud(on) { speedToggle.classList.toggle("hidden", !on); }
+  showHud(false);
+
+  document.getElementById("startBtn").addEventListener("click", () => {
+    initAudio(); startScreen.classList.add("hidden"); showHud(true);
+    if (!started) { reset(); started = true; }
+    running = true;
+  });
+  document.getElementById("pauseBtn").addEventListener("click", () => {
+    if (!started || !pauseScreen.classList.contains("hidden") || !startScreen.classList.contains("hidden")) return;
+    running = false; showHud(false);
+    pauseScore.textContent = "おはなを " + score + "こ あつめたよ";
+    pauseScreen.classList.remove("hidden");
+  });
+  document.getElementById("resumeBtn").addEventListener("click", () => {
+    pauseScreen.classList.add("hidden"); showHud(true); running = true;
+  });
+  document.getElementById("restartBtn").addEventListener("click", () => {
+    reset(); pauseScreen.classList.add("hidden"); showHud(true); running = true;
+  });
+  document.addEventListener("visibilitychange", () => { if (document.hidden) running = false; });
+
+  /* ============ タイトルの ももちゃん ============ */
+  const hc = document.getElementById("heroCanvas").getContext("2d");
+  (function heroLoop(t) {
+    hc.clearRect(0, 0, 300, 300);
+    drawBunny(hc, 150, 168, 190, t, true);
+    requestAnimationFrame(heroLoop);
+  })(0);
+
+  /* ============ スタート ============ */
+  window.addEventListener("resize", resize);
+  window.addEventListener("orientationchange", () => setTimeout(resize, 200));
+  resize(); reset();
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
