@@ -11,6 +11,14 @@
       "icon": "flower",
       "color": "pink",
       "hidden": false
+    },
+    {
+      "title": "きせかえ",
+      "subtitle": "ねねちゃんを おしゃれに しよう",
+      "folder": "kisekae",
+      "icon": "cat",
+      "color": "mint",
+      "hidden": false
     }
   ]
 }
