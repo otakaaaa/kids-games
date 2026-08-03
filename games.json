@@ -19,6 +19,14 @@
       "icon": "cat",
       "color": "mint",
       "hidden": false
+    },
+    {
+      "title": "めくりっこ",
+      "subtitle": "おなじ えを さがそう",
+      "folder": "shinkei",
+      "icon": "puzzle",
+      "color": "peach",
+      "hidden": false
     }
   ]
 }
