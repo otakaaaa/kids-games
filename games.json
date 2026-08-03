@@ -27,6 +27,14 @@
       "icon": "puzzle",
       "color": "peach",
       "hidden": false
+    },
+    {
+      "title": "おえかき",
+      "subtitle": "ぬったり かいたり しよう",
+      "folder": "oekaki",
+      "icon": "paint",
+      "color": "lilac",
+      "hidden": false
     }
   ]
 }

@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="おえかき">
+<meta name="theme-color" content="#f3f0ff">
+<meta name="robots" content="noindex, nofollow, noarchive">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" href="apple-touch-icon.png">
+<title>おえかき・ぬりえ</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html, body {
+    width:100%; height:100%; overflow:hidden; position:fixed;
+    touch-action:none; overscroll-behavior:none; background:#f3f0ff;
+    font-family:"Hiragino Maru Gothic ProN","ヒラギノ丸ゴ ProN","Rounded Mplus 1c",sans-serif;
+    user-select:none; -webkit-user-select:none; -webkit-text-size-adjust:100%;
+  }
+  #app { display:flex; flex-direction:column; width:100%; height:100%;
+         padding:max(8px, env(safe-area-inset-top)) 8px calc(6px + env(safe-area-inset-bottom)); }
+
+  #bar { flex:0 0 auto; display:flex; align-items:center; gap:5px; padding-bottom:7px; flex-wrap:nowrap; }
+  .btn {
+    flex:0 1 auto; min-width:0; overflow:hidden; white-space:nowrap;
+    font-family:inherit; font-weight:900; cursor:pointer; line-height:1; text-decoration:none;
+    background:#fff; border:3px solid #c3b3f0; border-radius:999px;
+    color:#6a4fc0; font-size:clamp(11px,3vw,17px); padding:0.5em 0.7em;
+    display:inline-flex; align-items:center; gap:0.25em;
+  }
+  .btn:active { background:#ece6ff; }
+  .btn.on { background:linear-gradient(#a98cf0,#7d59d8); border-color:#5b3bb0; color:#fff; }
+  #bar .sp { flex:1 1 auto; }
+  /* せまい がめん では もじを かくして アイコンだけに する */
+  @media (max-width:430px) { .btn .lb { display:none; } .btn { padding:0.5em 0.6em; } }
+
+  #paper { flex:1 1 auto; min-height:0; display:flex; align-items:center; justify-content:center; }
+  #cv { display:block; background:#fff; border-radius:18px; box-shadow:0 4px 14px rgba(90,60,180,.14); touch-action:none; }
+
+  #tools { flex:0 0 auto; padding-top:7px; display:flex; flex-direction:column; gap:6px; }
+  #pal { display:grid; grid-template-columns:repeat(auto-fit, minmax(clamp(30px,7vw,56px),1fr)); gap:5px; }
+  .col {
+    aspect-ratio:1/1; border-radius:50%; border:4px solid #fff; cursor:pointer;
+    box-shadow:0 0 0 2px #d6ccf5; transition:transform .1s;
+  }
+  .col.on { transform:scale(1.18); box-shadow:0 0 0 4px #6a4fc0; }
+  #sizes { display:flex; gap:8px; justify-content:center; align-items:center; }
+  .sz {
+    width:clamp(34px,9vw,52px); height:clamp(34px,9vw,52px); border-radius:50%;
+    background:#fff; border:3px solid #c3b3f0; cursor:pointer;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .sz.on { border-color:#6a4fc0; background:#ece6ff; }
+  .sz i { display:block; border-radius:50%; background:#6a4fc0; }
+
+  .screen {
+    position:absolute; inset:0; z-index:20; display:flex; flex-direction:column;
+    align-items:center; justify-content:center; gap:2.5vh; text-align:center;
+    background:rgba(243,240,255,.97); padding:18px; overflow-y:auto;
+  }
+  .screen.hidden { display:none; }
+  .title { font-size:clamp(24px,7vw,48px); color:#6a4fc0; font-weight:900;
+           text-shadow:0 3px 0 #fff, 0 5px 10px rgba(106,79,192,.2); }
+  .sub { font-size:clamp(13px,3.6vw,20px); color:#7f68c9; }
+  #picks { display:grid; grid-template-columns:repeat(auto-fill,minmax(clamp(88px,26vw,140px),1fr));
+           gap:10px; width:100%; max-width:640px; }
+  .pick { background:#fff; border:4px solid #c3b3f0; border-radius:20px; padding:6px; cursor:pointer; }
+  .pick canvas { width:100%; height:auto; display:block; }
+  .pick .n { font-size:clamp(11px,3vw,15px); font-weight:900; color:#6a4fc0; margin-top:3px; }
+  .pick.free { display:flex; flex-direction:column; align-items:center; justify-content:center; aspect-ratio:1/1; }
+  .pick.free .e { font-size:2.6em; }
+</style>
+</head>
+<body>
+
+<div id="app">
+  <div id="bar">
+    <a class="btn" href="../">🏠</a>
+    <button class="btn" id="modeFill">🪣<span class="lb"> ぬる</span></button>
+    <button class="btn" id="modeDraw">✏️<span class="lb"> かく</span></button>
+    <span class="sp"></span>
+    <button class="btn" id="undoBtn">↩️<span class="lb"> もどす</span></button>
+    <button class="btn" id="clearBtn">🧽<span class="lb"> けす</span></button>
+    <button class="btn" id="pickBtn">🖼️<span class="lb"> えらぶ</span></button>
+  </div>
+
+  <div id="paper"><canvas id="cv"></canvas></div>
+
+  <div id="tools">
+    <div id="pal"></div>
+    <div id="sizes"></div>
+  </div>
+</div>
+
+<div id="startScreen" class="screen">
+  <div class="title">おえかき</div>
+  <div class="sub">ぬりえを えらんでね</div>
+  <div id="picks"></div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  const LINE = "#7a5b46";
+
+  /* ============ パス の どうぐ ============ */
+  function pEll(cx, cy, rx, ry, rot) {
+    rot = rot || 0;
+    return g => {
+      g.moveTo(cx + rx * Math.cos(rot), cy + rx * Math.sin(rot));
+      g.ellipse(cx, cy, rx, ry, rot, 0, Math.PI * 2);
+    };
+  }
+  function pCirc(cx, cy, r) { return g => { g.moveTo(cx + r, cy); g.arc(cx, cy, r, 0, Math.PI * 2); }; }
+  function pPoly(pts) {
+    return g => { pts.forEach((p, i) => i ? g.lineTo(p[0], p[1]) : g.moveTo(p[0], p[1])); g.closePath(); };
+  }
+  function pAll(fns) { return g => fns.forEach(f => f(g)); }
+  // はなびら どうしが かさならない はば にする（かさなると せんが こうさして きたなく なる）
+  function pFlower(cx, cy, r) {
+    const fs = [];
+    for (let i = 0; i < 5; i++) {
+      const a = (i / 5) * Math.PI * 2;
+      fs.push(pEll(cx + Math.sin(a) * r * 0.62, cy - Math.cos(a) * r * 0.62, r * 0.34, r * 0.56, a));
+    }
+    return pAll(fs);
+  }
+
+  /* ============ ぬりえ の え（100x100） ============ */
+  // r: ぬれる ところ / dt: せんだけ の ぶぶん
+  const PICS = [
+    { name: "ももちゃん",
+      r: [
+        pEll(32, 28, 8.5, 26, -0.26), pEll(68, 28, 8.5, 26, 0.26),
+        pEll(32, 28, 4, 19, -0.26), pEll(68, 28, 4, 19, 0.26),
+        pEll(50, 88, 21, 12),
+        pEll(50, 62, 27, 25),
+        g => {
+          g.moveTo(24, 50); g.bezierCurveTo(21, 28, 35, 16, 50, 16);
+          g.bezierCurveTo(65, 16, 79, 28, 76, 50);
+          for (let i = 0; i < 6; i++) g.arc(76 - i * (52 / 6) - (52 / 12), 50, 52 / 12, 0, Math.PI, false);
+          g.closePath();
+        },
+        pFlower(68, 42, 10), pCirc(68, 42, 3.4),
+        pAll([pEll(23, 13, 5.2, 3.9, -0.5), pEll(33, 13, 5.2, 3.9, 0.5), pCirc(28, 13, 2.5)])
+      ],
+      dt: g => {
+        g.lineWidth = 2.4; g.strokeStyle = LINE; g.lineCap = "round";
+        for (const dx of [-10, 10]) {
+          g.fillStyle = LINE; g.beginPath(); g.ellipse(50 + dx, 64, 4.4, 5.8, 0, 0, Math.PI * 2); g.fill();
+          g.fillStyle = "#fff"; g.beginPath(); g.arc(50 + dx + 1.6, 62, 1.9, 0, Math.PI * 2); g.fill();
+        }
+        g.beginPath(); g.ellipse(50, 71, 2.2, 1.6, 0, 0, Math.PI * 2); g.stroke();
+        g.beginPath(); g.arc(50, 73, 5, .12 * Math.PI, .88 * Math.PI); g.stroke();
+      } },
+
+    { name: "ねねちゃん",
+      r: [
+        pPoly([[42, 34], [29, 14], [25, 40]]), pPoly([[58, 34], [71, 14], [75, 40]]),
+        pPoly([[41, 34], [32, 21], [30, 37]]), pPoly([[59, 34], [68, 21], [70, 37]]),
+        g => { g.moveTo(72, 84); g.bezierCurveTo(92, 88, 96, 62, 86, 54);
+               g.bezierCurveTo(90, 66, 84, 80, 70, 78); g.closePath(); },
+        pEll(50, 86, 23, 17),
+        pEll(50, 56, 27, 25)
+      ],
+      dt: g => {
+        g.lineWidth = 2.4; g.strokeStyle = LINE; g.lineCap = "round";
+        for (const dir of [-1, 1]) for (let i = 0; i < 3; i++) {
+          const y = 54 + i * 4.5;
+          g.beginPath(); g.moveTo(50 + dir * 19, y); g.lineTo(50 + dir * 36, y - 3 + i * 3); g.stroke();
+        }
+        for (const dx of [-10, 10]) {
+          g.fillStyle = LINE; g.beginPath(); g.ellipse(50 + dx, 53, 4.6, 6, 0, 0, Math.PI * 2); g.fill();
+          g.fillStyle = "#fff"; g.beginPath(); g.arc(50 + dx + 1.6, 51, 2, 0, Math.PI * 2); g.fill();
+        }
+        g.beginPath(); g.moveTo(47, 61); g.lineTo(53, 61); g.lineTo(50, 64); g.closePath(); g.stroke();
+        g.beginPath(); g.arc(47, 66, 3, .05 * Math.PI, .95 * Math.PI); g.stroke();
+        g.beginPath(); g.arc(53, 66, 3, .05 * Math.PI, .95 * Math.PI); g.stroke();
+      } },
+
+    { name: "おはな",
+      r: [
+        g => { g.moveTo(47, 52); g.lineTo(53, 52); g.lineTo(53, 92); g.lineTo(47, 92); g.closePath(); },
+        pEll(30, 72, 15, 7, -0.45), pEll(70, 82, 14, 6.5, 0.45),
+        pFlower(50, 38, 34), pCirc(50, 38, 11),
+        pFlower(20, 30, 15), pCirc(20, 30, 5),
+        pFlower(82, 22, 13), pCirc(82, 22, 4.4)
+      ],
+      dt: null },
+
+    { name: "ちょうちょ",
+      r: [
+        pEll(26, 38, 21, 18, -0.4), pEll(74, 38, 21, 18, 0.4),
+        pEll(30, 68, 16, 14, 0.35), pEll(70, 68, 16, 14, -0.35),
+        pCirc(24, 36, 6.5), pCirc(76, 36, 6.5),
+        pCirc(30, 68, 4.6), pCirc(70, 68, 4.6),
+        pEll(50, 53, 5.5, 24)
+      ],
+      dt: g => {
+        g.lineWidth = 2.6; g.strokeStyle = LINE; g.lineCap = "round";
+        g.beginPath(); g.moveTo(47, 31); g.quadraticCurveTo(38, 16, 31, 15); g.stroke();
+        g.beginPath(); g.moveTo(53, 31); g.quadraticCurveTo(62, 16, 69, 15); g.stroke();
+        g.beginPath(); g.arc(31, 15, 2.6, 0, Math.PI * 2); g.stroke();
+        g.beginPath(); g.arc(69, 15, 2.6, 0, Math.PI * 2); g.stroke();
+      } },
+
+    { name: "ケーキ",
+      r: [
+        g => { g.moveTo(18, 54); g.lineTo(82, 54); g.lineTo(82, 88); g.lineTo(18, 88); g.closePath(); },
+        g => {
+          g.moveTo(18, 56);
+          g.bezierCurveTo(27, 70, 36, 70, 44, 56);
+          g.bezierCurveTo(52, 70, 61, 70, 69, 56);
+          g.bezierCurveTo(74, 65, 79, 63, 82, 56);
+          g.lineTo(82, 42); g.lineTo(18, 42); g.closePath();
+        },
+        pCirc(29, 46, 6), pCirc(50, 46, 6), pCirc(71, 46, 6),
+        g => { g.moveTo(46, 42); g.lineTo(54, 42); g.lineTo(54, 22); g.lineTo(46, 22); g.closePath(); },
+        pEll(50, 15, 6, 9)
+      ],
+      dt: g => {
+        // クリームの たれた ところと かさならない たかさに ひく
+        g.lineWidth = 2.2; g.strokeStyle = LINE;
+        [75, 82].forEach(y => { g.beginPath(); g.moveTo(18, y); g.lineTo(82, y); g.stroke(); });
+      } },
+
+    { name: "おうち",
+      r: [
+        pCirc(82, 18, 13),
+        pAll([pCirc(16, 22, 9), pCirc(27, 18, 12), pCirc(39, 23, 8.5)]),
+        pPoly([[50, 26], [90, 54], [10, 54]]),
+        pPoly([[18, 54], [82, 54], [82, 90], [18, 90]]),
+        pPoly([[41, 64], [59, 64], [59, 90], [41, 90]]),
+        pCirc(29, 66, 8), pCirc(71, 66, 8),
+        pPoly([[6, 90], [94, 90], [94, 98], [6, 98]])
+      ],
+      dt: g => {
+        g.lineWidth = 2.2; g.strokeStyle = LINE; g.lineCap = "round";
+        g.beginPath(); g.moveTo(21, 66); g.lineTo(37, 66); g.moveTo(29, 58); g.lineTo(29, 74); g.stroke();
+        g.beginPath(); g.moveTo(63, 66); g.lineTo(79, 66); g.moveTo(71, 58); g.lineTo(71, 74); g.stroke();
+        g.beginPath(); g.arc(54, 78, 2.2, 0, Math.PI * 2); g.stroke();
+      } }
+  ];
+
+  const COLORS = ["#ff6b9d", "#ff4d4d", "#ff9a3c", "#ffd93c", "#a8e063", "#2fae6b",
+                  "#6ec6ff", "#3d7ff5", "#b07cf0", "#8d5b3f", "#ffffff", "#5a5a5a"];
+  const SIZES = [1.6, 3.4, 6.4];   // 100たんい くうかん での ふとさ
+
+  /* ============ じょうたい ============ */
+  let picIdx = 0, free = false, mode = "fill", color = COLORS[0], size = SIZES[1];
+  let fills = [], strokes = [], history = [], cur = null;
+
+  /* ============ キャンバス ============ */
+  const cv = document.getElementById("cv"), ctx = cv.getContext("2d");
+  const paper = document.getElementById("paper");
+  let side = 100, dpr = 1;
+
+  function resize() {
+    dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+    const W = paper.clientWidth, H = paper.clientHeight;
+    if (!W || !H) return;
+    side = Math.floor(Math.min(W, H));
+    cv.width = Math.floor(side * dpr); cv.height = Math.floor(side * dpr);
+    cv.style.width = side + "px"; cv.style.height = side + "px";
+    render();
+  }
+  window.addEventListener("resize", resize);
+  window.addEventListener("orientationchange", () => setTimeout(resize, 200));
+  if (window.ResizeObserver) new ResizeObserver(resize).observe(paper);
+
+  // 100たんい くうかん -> キャンバス
+  function setT(g) { g.setTransform(dpr, 0, 0, dpr, 0, 0); g.scale(side / 100, side / 100); }
+
+  function render() {
+    const g = ctx;
+    g.setTransform(1, 0, 0, 1, 0, 0);
+    g.clearRect(0, 0, cv.width, cv.height);
+    g.fillStyle = "#fff"; g.fillRect(0, 0, cv.width, cv.height);
+    setT(g);
+
+    // ぬりえ：1つずつ「ぬって→ふちどる」。こうすると したの ずけいの せんが
+    // うえの ずけいを つきぬけて みえることが ない
+    if (!free) drawPic(g, PICS[picIdx], fills);
+
+    // ゆびで かいた せん（いちばん うえ）
+    g.lineCap = "round"; g.lineJoin = "round";
+    for (const s of strokes) {
+      g.strokeStyle = s.c; g.lineWidth = s.w;
+      g.beginPath();
+      s.p.forEach((pt, i) => i ? g.lineTo(pt[0], pt[1]) : g.moveTo(pt[0], pt[1]));
+      if (s.p.length === 1) { g.lineTo(s.p[0][0] + 0.01, s.p[0][1]); }
+      g.stroke();
+    }
+  }
+
+  function drawPic(g, pic, cols) {
+    g.strokeStyle = LINE; g.lineWidth = 2.4; g.lineJoin = "round"; g.lineCap = "round";
+    pic.r.forEach((p, i) => {
+      g.beginPath(); p(g);
+      g.fillStyle = (cols && cols[i]) || "#ffffff";
+      g.fill(); g.stroke();
+    });
+    if (pic.dt) { g.save(); pic.dt(g); g.restore(); }
+  }
+
+  /* ============ そうさ ============ */
+  function pos(e) {
+    const r = cv.getBoundingClientRect();
+    return { x: (e.clientX - r.left) * dpr, y: (e.clientY - r.top) * dpr,
+             ux: (e.clientX - r.left) / side * 100, uy: (e.clientY - r.top) / side * 100 };
+  }
+
+  function hit(p) {
+    if (free) return -1;
+    const g = ctx; setT(g);
+    const rs = PICS[picIdx].r;
+    for (let i = rs.length - 1; i >= 0; i--) {
+      g.beginPath(); rs[i](g);
+      if (g.isPointInPath(p.x, p.y)) return i;
+    }
+    return -1;
+  }
+
+  let drawing = false;
+  cv.addEventListener("pointerdown", e => {
+    e.preventDefault(); initAudio();
+    const p = pos(e);
+    if (mode === "fill" && !free) {
+      const i = hit(p);
+      if (i >= 0) {
+        history.push({ t: "fill", i: i, prev: fills[i] });
+        fills[i] = color; render(); beep(660);
+      }
+      return;
+    }
+    drawing = true; cur = { c: color, w: size, p: [[p.ux, p.uy]] };
+    strokes.push(cur); render();
+  });
+  cv.addEventListener("pointermove", e => {
+    if (!drawing || !cur) return;
+    e.preventDefault();
+    const p = pos(e);
+    const last = cur.p[cur.p.length - 1];
+    if (Math.abs(p.ux - last[0]) + Math.abs(p.uy - last[1]) < 0.4) return;
+    cur.p.push([p.ux, p.uy]); render();
+  });
+  function endDraw() {
+    if (drawing && cur) { history.push({ t: "stroke" }); }
+    drawing = false; cur = null;
+  }
+  window.addEventListener("pointerup", endDraw);
+  window.addEventListener("pointercancel", endDraw);
+  document.addEventListener("touchmove", e => { if (drawing) e.preventDefault(); }, { passive: false });
+  document.addEventListener("gesturestart", e => e.preventDefault());
+
+  /* ============ ボタン ============ */
+  const modeFill = document.getElementById("modeFill"), modeDraw = document.getElementById("modeDraw");
+  function setMode(m) {
+    mode = m;
+    modeFill.classList.toggle("on", m === "fill");
+    modeDraw.classList.toggle("on", m === "draw");
+    document.getElementById("sizes").style.display = (m === "draw") ? "flex" : "none";
+  }
+  modeFill.addEventListener("click", () => { if (free) return; setMode("fill"); beep(560); });
+  modeDraw.addEventListener("click", () => { setMode("draw"); beep(700); });
+
+  document.getElementById("undoBtn").addEventListener("click", () => {
+    const h = history.pop(); if (!h) return;
+    if (h.t === "fill") fills[h.i] = h.prev; else strokes.pop();
+    render(); beep(420);
+  });
+  document.getElementById("clearBtn").addEventListener("click", () => {
+    fills = []; strokes = []; history = []; render(); beep(340);
+  });
+  document.getElementById("pickBtn").addEventListener("click", () => {
+    document.getElementById("startScreen").classList.remove("hidden"); beep(600);
+  });
+
+  /* ============ パレット ============ */
+  const palEl = document.getElementById("pal");
+  COLORS.forEach((c, i) => {
+    const d = document.createElement("div");
+    d.className = "col" + (i === 0 ? " on" : "");
+    d.style.background = c;
+    d.addEventListener("click", () => {
+      color = c;
+      [...palEl.children].forEach((x, j) => x.classList.toggle("on", j === i));
+      beep(500 + i * 40);
+    });
+    palEl.appendChild(d);
+  });
+  const szEl = document.getElementById("sizes");
+  SIZES.forEach((s, i) => {
+    const d = document.createElement("div");
+    d.className = "sz" + (i === 1 ? " on" : "");
+    const dot = document.createElement("i");
+    const px = 6 + i * 7; dot.style.width = px + "px"; dot.style.height = px + "px";
+    d.appendChild(dot);
+    d.addEventListener("click", () => {
+      size = s;
+      [...szEl.children].forEach((x, j) => x.classList.toggle("on", j === i));
+      beep(600);
+    });
+    szEl.appendChild(d);
+  });
+
+  /* ============ えらぶ がめん ============ */
+  const startScreen = document.getElementById("startScreen"), picksEl = document.getElementById("picks");
+
+  PICS.forEach((pic, i) => {
+    const d = document.createElement("div"); d.className = "pick";
+    const c = document.createElement("canvas"); c.width = 220; c.height = 220;
+    const g = c.getContext("2d");
+    g.fillStyle = "#fff"; g.fillRect(0, 0, 220, 220);
+    g.scale(2.2, 2.2);
+    drawPic(g, pic, null);
+    d.appendChild(c);
+    const n = document.createElement("div"); n.className = "n"; n.textContent = pic.name;
+    d.appendChild(n);
+    d.addEventListener("click", () => {
+      initAudio(); picIdx = i; free = false;
+      fills = []; strokes = []; history = [];
+      setMode("fill"); modeFill.style.display = "";
+      startScreen.classList.add("hidden"); resize(); beep(880);
+    });
+    picksEl.appendChild(d);
+  });
+  // じゆうに かく
+  (function () {
+    const d = document.createElement("div"); d.className = "pick free";
+    d.innerHTML = '<div class="e">✏️</div><div class="n">じゆうに かく</div>';
+    d.addEventListener("click", () => {
+      initAudio(); free = true;
+      fills = []; strokes = []; history = [];
+      setMode("draw"); modeFill.style.display = "none";
+      startScreen.classList.add("hidden"); resize(); beep(880);
+    });
+    picksEl.appendChild(d);
+  })();
+
+  /* ============ おと ============ */
+  let ac = null;
+  function initAudio() {
+    if (!ac) { try { ac = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { ac = null; } }
+    if (ac && ac.state === "suspended") ac.resume();
+  }
+  function beep(f) {
+    if (!ac) return;
+    const o = ac.createOscillator(), g = ac.createGain();
+    o.type = "triangle"; o.frequency.value = f;
+    g.gain.setValueAtTime(0, ac.currentTime);
+    g.gain.linearRampToValueAtTime(0.1, ac.currentTime + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, ac.currentTime + 0.16);
+    o.connect(g); g.connect(ac.destination);
+    o.start(); o.stop(ac.currentTime + 0.2);
+  }
+
+  setMode("fill");
+  resize();
+})();
+</script>
+</body>
+</html>
