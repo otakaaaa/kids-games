@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="おんがく">
+<meta name="theme-color" content="#eef4ff">
+<meta name="robots" content="noindex, nofollow, noarchive">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" href="apple-touch-icon.png">
+<title>おんがくあそび</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html, body {
+    width:100%; height:100%; overflow:hidden; position:fixed;
+    touch-action:manipulation; overscroll-behavior:none; background:#eef4ff;
+    font-family:"Hiragino Maru Gothic ProN","ヒラギノ丸ゴ ProN","Rounded Mplus 1c",sans-serif;
+    user-select:none; -webkit-user-select:none; -webkit-text-size-adjust:100%;
+  }
+  #app { display:flex; flex-direction:column; width:100%; height:100%;
+         padding:max(8px, env(safe-area-inset-top)) 8px calc(8px + env(safe-area-inset-bottom)); }
+
+  #bar { flex:0 0 auto; display:flex; align-items:center; gap:5px; padding-bottom:8px; }
+  .btn {
+    flex:0 1 auto; min-width:0; overflow:hidden; white-space:nowrap;
+    font-family:inherit; font-weight:900; cursor:pointer; line-height:1; text-decoration:none;
+    background:#fff; border:3px solid #a9c4f5; border-radius:999px;
+    color:#3a63b8; font-size:clamp(11px,3vw,17px); padding:0.5em 0.75em;
+    display:inline-flex; align-items:center; gap:0.25em;
+  }
+  .btn:active { background:#e2ecff; }
+  .btn.on { background:linear-gradient(#8fb6f8,#4f80e0); border-color:#2f5cb8; color:#fff; }
+  #bar .sp { flex:1 1 auto; }
+  @media (max-width:430px) { .btn .lb { display:none; } .btn { padding:0.5em 0.62em; } }
+
+  #stage { position:relative; flex:1 1 auto; min-height:0; display:flex; flex-direction:column; }
+  #fx { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; z-index:3; }
+
+  /* --- どうぶつ --- */
+  #animals {
+    flex:1 1 auto; min-height:0; display:grid; gap:clamp(6px,2vw,14px);
+    grid-template-columns:repeat(4, 1fr); align-content:center;
+  }
+  @media (orientation:landscape) { #animals { grid-template-columns:repeat(8, 1fr); } }
+  .an {
+    border-radius:24px; border:5px solid rgba(0,0,0,.09); cursor:pointer;
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px;
+    min-height:0; transition:transform .09s;
+    box-shadow:0 5px 0 rgba(0,0,0,.13);
+  }
+  .an .e { font-size:clamp(26px,9vw,64px); line-height:1; }
+  .an .n { font-size:clamp(12px,3.2vw,20px); font-weight:900; color:rgba(0,0,0,.5); }
+  .an.hit { transform:scale(.9) translateY(4px); box-shadow:0 1px 0 rgba(0,0,0,.13); }
+
+  /* --- けんばん --- */
+  #keys { flex:1 1 auto; min-height:0; display:flex; gap:clamp(3px,1vw,8px); }
+  .key {
+    flex:1 1 0; min-width:0; border-radius:0 0 16px 16px; border:4px solid rgba(0,0,0,.1);
+    border-top:none; cursor:pointer; position:relative;
+    display:flex; align-items:flex-end; justify-content:center; padding-bottom:6%;
+    box-shadow:0 6px 0 rgba(0,0,0,.14); transition:transform .08s;
+  }
+  .key .n { font-size:clamp(13px,3.6vw,26px); font-weight:900; color:rgba(0,0,0,.45); }
+  .key.hit { transform:translateY(5px); box-shadow:0 1px 0 rgba(0,0,0,.14); }
+  .key.next { animation:glow .8s ease-in-out infinite; }
+  .key.next::after {
+    content:"👆"; position:absolute; top:8%; left:50%; transform:translateX(-50%);
+    font-size:clamp(20px,6vw,40px); animation:bob .8s ease-in-out infinite;
+  }
+  @keyframes glow { 0%,100%{filter:brightness(1)} 50%{filter:brightness(1.35)} }
+  @keyframes bob { 0%,100%{transform:translate(-50%,0)} 50%{transform:translate(-50%,-14%)} }
+
+  /* --- うた --- */
+  #songbar { flex:0 0 auto; display:flex; gap:6px; align-items:center; padding-bottom:8px; flex-wrap:wrap; }
+  .song {
+    font-family:inherit; font-weight:900; cursor:pointer; font-size:clamp(11px,3vw,17px);
+    background:#fff; border:3px solid #ffc46b; border-radius:999px; color:#c07d18; padding:0.45em 0.8em;
+  }
+  .song.on { background:linear-gradient(#ffd07a,#f5a72a); border-color:#c07d18; color:#fff; }
+  #prog { flex:1 1 auto; min-width:80px; height:14px; background:#fff; border:3px solid #a9c4f5; border-radius:999px; overflow:hidden; }
+  #progIn { height:100%; width:0%; background:linear-gradient(90deg,#8fd6bc,#4fc08d); transition:width .2s; }
+
+  .hide { display:none !important; }
+
+  .screen {
+    position:absolute; inset:0; z-index:20; display:flex; flex-direction:column;
+    align-items:center; justify-content:center; gap:3vh; text-align:center;
+    background:rgba(238,244,255,.96); padding:20px;
+  }
+  .screen.hidden { display:none; }
+  .title { font-size:clamp(26px,7.5vw,52px); color:#3a63b8; font-weight:900;
+           text-shadow:0 3px 0 #fff, 0 5px 10px rgba(58,99,184,.2); }
+  .sub { font-size:clamp(14px,3.8vw,22px); color:#5b7fc7; }
+  .bigbtn {
+    font-family:inherit; font-weight:900; border:none; cursor:pointer; text-decoration:none;
+    font-size:clamp(20px,5.6vw,36px); color:#fff;
+    background:linear-gradient(#8fb6f8,#4f80e0);
+    padding:0.5em 1.3em; border-radius:999px;
+    box-shadow:0 7px 0 #2f5cb8, 0 10px 20px rgba(47,92,184,.3);
+    display:inline-flex; align-items:center; gap:0.3em;
+  }
+  .bigbtn:active { transform:translateY(5px); box-shadow:0 2px 0 #2f5cb8; }
+  .row { display:flex; gap:3vw; flex-wrap:wrap; justify-content:center; }
+</style>
+</head>
+<body>
+
+<div id="app">
+  <div id="bar">
+    <a class="btn" href="../">🏠</a>
+    <button class="btn on" id="mAnimal">🐰<span class="lb"> どうぶつ</span></button>
+    <button class="btn" id="mKeys">🎹<span class="lb"> けんばん</span></button>
+    <button class="btn" id="mSong">🎵<span class="lb"> うた</span></button>
+  </div>
+
+  <div id="songbar" class="hide">
+    <div id="songs"></div>
+    <div id="prog"><div id="progIn"></div></div>
+  </div>
+
+  <div id="stage">
+    <div id="animals"></div>
+    <div id="keys" class="hide"></div>
+    <canvas id="fx"></canvas>
+  </div>
+</div>
+
+<div id="winScreen" class="screen hidden">
+  <div class="title" id="winTitle">じょうず！</div>
+  <div class="sub" id="winSub"></div>
+  <div class="row">
+    <button class="bigbtn" id="winAgain">🔄 もういちど</button>
+    <a class="bigbtn" href="../" style="background:linear-gradient(#ffe07a,#f5bb2a);box-shadow:0 7px 0 #cf9508;color:#7a5600;">🏠 おうち</a>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  /* ============ おと ============ */
+  const FREQ = [261.63, 293.66, 329.63, 349.23, 392.00, 440.00, 493.88, 523.25];
+  const NAMES = ["ド", "レ", "ミ", "ファ", "ソ", "ラ", "シ", "ド"];
+  const HUES  = ["#ff8a8a", "#ffb066", "#ffdd5c", "#9ede84", "#7fc9f5", "#8fa8f0", "#c49bf0", "#ff9ec9"];
+  const ANIMALS = ["🐰", "🐱", "🐻", "🐘", "🐤", "🐸", "🐷", "🐶"];
+
+  let ac = null;
+  function initAudio() {
+    if (!ac) { try { ac = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { ac = null; } }
+    if (ac && ac.state === "suspended") ac.resume();
+  }
+  // もっきん のような やわらかい おと
+  function note(i, dur) {
+    initAudio(); if (!ac) return;
+    const f = FREQ[i], t0 = ac.currentTime; dur = dur || 1.5;
+    const out = ac.createGain();
+    out.gain.setValueAtTime(0, t0);
+    out.gain.linearRampToValueAtTime(0.22, t0 + 0.012);
+    out.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    out.connect(ac.destination);
+
+    const o1 = ac.createOscillator(); o1.type = "sine"; o1.frequency.value = f;
+    o1.connect(out);
+    const o2 = ac.createOscillator(); o2.type = "sine"; o2.frequency.value = f * 4.02;
+    const g2 = ac.createGain();
+    g2.gain.setValueAtTime(0.28, t0);
+    g2.gain.exponentialRampToValueAtTime(0.0001, t0 + dur * 0.28);
+    o2.connect(g2); g2.connect(out);
+
+    o1.start(t0); o2.start(t0);
+    o1.stop(t0 + dur + 0.1); o2.stop(t0 + dur + 0.1);
+  }
+  function chime(seq) { seq.forEach((n, k) => setTimeout(() => note(n, 0.9), k * 120)); }
+
+  /* ============ ♪ の エフェクト ============ */
+  const fx = document.getElementById("fx"), fg = fx.getContext("2d");
+  const stage = document.getElementById("stage");
+  let parts = [], dpr = 1;
+  function fxResize() {
+    dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+    fx.width = Math.floor(stage.clientWidth * dpr); fx.height = Math.floor(stage.clientHeight * dpr);
+    fg.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  function burst(el, color) {
+    const r = el.getBoundingClientRect(), s = stage.getBoundingClientRect();
+    const cx = r.left - s.left + r.width / 2, cy = r.top - s.top + r.height / 2;
+    for (let i = 0; i < 7; i++) parts.push({
+      x: cx, y: cy, vx: (Math.random() - .5) * 2.4, vy: -1.6 - Math.random() * 2.2,
+      life: 1, c: color, s: 14 + Math.random() * 14, ch: Math.random() < .5 ? "♪" : "♫",
+      rot: (Math.random() - .5) * .6
+    });
+  }
+  (function fxLoop() {
+    fg.clearRect(0, 0, fx.width, fx.height);
+    for (let i = parts.length - 1; i >= 0; i--) {
+      const p = parts[i];
+      p.x += p.vx; p.y += p.vy; p.vy += 0.045; p.life -= 0.012;
+      if (p.life <= 0) { parts.splice(i, 1); continue; }
+      fg.save(); fg.globalAlpha = Math.max(0, p.life);
+      fg.translate(p.x, p.y); fg.rotate(p.rot);
+      fg.font = "900 " + p.s + "px sans-serif"; fg.textAlign = "center";
+      fg.fillStyle = p.c; fg.fillText(p.ch, 0, 0);
+      fg.restore();
+    }
+    requestAnimationFrame(fxLoop);
+  })();
+
+  /* ============ どうぶつ ============ */
+  const animalsEl = document.getElementById("animals");
+  ANIMALS.forEach((a, i) => {
+    const d = document.createElement("div");
+    d.className = "an"; d.style.background = HUES[i];
+    d.innerHTML = '<div class="e">' + a + '</div><div class="n">' + NAMES[i] + "</div>";
+    d.addEventListener("pointerdown", e => { e.preventDefault(); hitNote(i, d); });
+    animalsEl.appendChild(d);
+  });
+
+  /* ============ けんばん ============ */
+  const keysEl = document.getElementById("keys");
+  const keyEls = FREQ.map((_, i) => {
+    const d = document.createElement("div");
+    d.className = "key"; d.style.background = HUES[i];
+    d.innerHTML = '<div class="n">' + NAMES[i] + "</div>";
+    d.addEventListener("pointerdown", e => { e.preventDefault(); hitNote(i, d); });
+    keysEl.appendChild(d);
+    return d;
+  });
+
+  function hitNote(i, el) {
+    note(i);
+    el.classList.add("hit");
+    setTimeout(() => el.classList.remove("hit"), 110);
+    burst(el, "rgba(255,255,255,.95)");
+    if (mode === "song") checkSong(i);
+  }
+
+  /* ============ うた ============ */
+  const SONGS = [
+    { name: "きらきらぼし", n: [0, 0, 4, 4, 5, 5, 4, 3, 3, 2, 2, 1, 1, 0] },
+    { name: "ちょうちょう", n: [4, 2, 2, 3, 1, 1, 0, 1, 2, 3, 4, 4, 4] },
+    { name: "チューリップ", n: [0, 1, 2, 0, 1, 2, 4, 2, 1, 0, 1, 2, 1] }
+  ];
+  let songIdx = 0, pos = 0, mode = "animal";
+  const songsEl = document.getElementById("songs"), progIn = document.getElementById("progIn");
+
+  SONGS.forEach((s, i) => {
+    const b = document.createElement("button");
+    b.className = "song" + (i === 0 ? " on" : "");
+    b.textContent = s.name;
+    b.addEventListener("click", () => {
+      initAudio(); songIdx = i; pos = 0;
+      [...songsEl.children].forEach((x, j) => x.classList.toggle("on", j === i));
+      showNext();
+    });
+    songsEl.appendChild(b);
+  });
+
+  function showNext() {
+    keyEls.forEach(k => k.classList.remove("next"));
+    const s = SONGS[songIdx];
+    progIn.style.width = (pos / s.n.length * 100) + "%";
+    if (mode === "song" && pos < s.n.length) keyEls[s.n[pos]].classList.add("next");
+  }
+
+  function checkSong(i) {
+    const s = SONGS[songIdx];
+    if (pos >= s.n.length) return;
+    if (i !== s.n[pos]) return;      // ちがっても おこらない。おとは なる
+    pos++;
+    showNext();
+    if (pos >= s.n.length) {
+      keyEls.forEach(k => k.classList.remove("next"));
+      setTimeout(() => {
+        document.getElementById("winSub").textContent = "「" + s.name + "」が ひけたね";
+        document.getElementById("winTitle").textContent =
+          ["じょうず！", "すごい！", "やったね！", "はくしゅ！"][Math.floor(Math.random() * 4)];
+        document.getElementById("winScreen").classList.remove("hidden");
+        chime([0, 2, 4, 7]);
+      }, 500);
+    }
+  }
+
+  document.getElementById("winAgain").addEventListener("click", () => {
+    document.getElementById("winScreen").classList.add("hidden");
+    pos = 0; showNext();
+  });
+
+  /* ============ モード ============ */
+  const mA = document.getElementById("mAnimal"), mK = document.getElementById("mKeys"), mS = document.getElementById("mSong");
+  const songbar = document.getElementById("songbar");
+  function setMode(m) {
+    mode = m; initAudio();
+    mA.classList.toggle("on", m === "animal");
+    mK.classList.toggle("on", m === "keys");
+    mS.classList.toggle("on", m === "song");
+    animalsEl.classList.toggle("hide", m !== "animal");
+    keysEl.classList.toggle("hide", m === "animal");
+    songbar.classList.toggle("hide", m !== "song");
+    if (m === "song") { pos = 0; }
+    showNext();
+    setTimeout(fxResize, 0);
+  }
+  mA.addEventListener("click", () => setMode("animal"));
+  mK.addEventListener("click", () => setMode("keys"));
+  mS.addEventListener("click", () => setMode("song"));
+
+  window.addEventListener("resize", fxResize);
+  window.addEventListener("orientationchange", () => setTimeout(fxResize, 200));
+  if (window.ResizeObserver) new ResizeObserver(fxResize).observe(stage);
+
+  setMode("animal");
+  fxResize();
+})();
+</script>
+</body>
+</html>

@@ -35,6 +35,14 @@
       "icon": "paint",
       "color": "lilac",
       "hidden": false
+    },
+    {
+      "title": "おんがく",
+      "subtitle": "たたいて おとを ならそう",
+      "folder": "ongaku",
+      "icon": "music",
+      "color": "sky",
+      "hidden": false
     }
   ]
 }
