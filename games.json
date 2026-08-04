@@ -43,6 +43,22 @@
       "icon": "music",
       "color": "sky",
       "hidden": false
+    },
+    {
+      "title": "のりのりリズム",
+      "subtitle": "おんがくに あわせて タップ",
+      "folder": "rhythm",
+      "icon": "ball",
+      "color": "peach",
+      "hidden": false
+    },
+    {
+      "title": "おはなキャッチ",
+      "subtitle": "とんできたら タップ！",
+      "folder": "catch",
+      "icon": "star",
+      "color": "lemon",
+      "hidden": false
     }
   ]
 }
