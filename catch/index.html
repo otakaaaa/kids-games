@@ -341,18 +341,22 @@
   stage.addEventListener("pointerdown", e => { e.preventDefault(); tap(); });
 
   function burst() {
-    const S = sceneScale();
-    const p = toScreen(CATCHER_X, GROUND - 18, S);
-    for (let i = 0; i < 12; i++) parts.push({
-      x: p.x, y: p.y, vx: (Math.random() - .5) * 6, vy: -2 - Math.random() * 5,
-      life: 1, c: ["#ffd45c", "#ff9ec9", "#8fd6bc", "#fff"][i % 4], s: 3 + Math.random() * 5
+    const u = Math.min(W, H);
+    for (let i = 0; i < 14; i++) parts.push({
+      x: CA.x * W, y: CA.y * H - u * 0.16, vx: (Math.random() - .5) * 7, vy: -2 - Math.random() * 6,
+      life: 1, c: ["#ffd45c", "#ff9ec9", "#8fd6bc", "#fff"][i % 4], s: 3 + Math.random() * 6
     });
   }
 
-  /* ============ シーン（200 x 100 の かそう くうかん） ============ */
-  const SW = 200, SH = 100, GROUND = 74, THROWER_X = 38, CATCHER_X = 156;
-  function sceneScale() { return Math.min(W / SW, H / SH); }
-  function toScreen(x, y, s) { return { x: (W - SW * s) / 2 + x * s, y: (H - SH * s) / 2 + y * s }; }
+  /* ============ シーン（がめん の わりあい で いち を きめる） ============
+     なげて は おく（うえ・ひだり）、うけて は てまえ（した・みぎ）。
+     たいかくせん に とんでくる ので、おくゆき が でて わかりやすい      */
+  const HZ = 0.36;                       // ちへいせん の たかさ
+  const TH = { x: 0.22, y: 0.46 };       // ねねちゃん（おく）
+  const CA = { x: 0.72, y: 0.90 };       // ももちゃん（てまえ）
+  const D0 = { x: 0.27, y: 0.40 };       // ディスク の スタート
+  const D1 = { x: 0.69, y: 0.74 };       // ディスク の ゴール
+  const lerp = (a, b, t) => a + (b - a) * t;
 
   function drawFlowerDisc(c, x, y, r, rot, tilt) {
     c.save(); c.translate(x, y); c.rotate(rot); c.scale(1, tilt);
@@ -474,110 +478,107 @@
   /* ============ びょうが ============ */
   (function loop() {
     if (!W || !H) { requestAnimationFrame(loop); return; }
-    const s = sceneScale();
     const now = running ? (T() - songStart) : -99;
     const tt = performance.now();
+    const u = Math.min(W, H), hz = HZ * H;
 
     // そら
-    const sky = g.createLinearGradient(0, 0, 0, H);
-    sky.addColorStop(0, "#bfe4ff"); sky.addColorStop(0.55, "#e6f5ff"); sky.addColorStop(1, "#fdf6e3");
-    g.fillStyle = sky; g.fillRect(0, 0, W, H);
+    const sky = g.createLinearGradient(0, 0, 0, hz);
+    sky.addColorStop(0, "#a9daff"); sky.addColorStop(1, "#eaf7ff");
+    g.fillStyle = sky; g.fillRect(0, 0, W, hz);
 
-    // うかぶ しま
-    g.fillStyle = "rgba(178,205,240,.55)";
-    [[24, 22, 15], [92, 14, 11], [172, 26, 13]].forEach(o => {
-      const p = toScreen(o[0], o[1], s);
-      g.beginPath(); g.ellipse(p.x, p.y, o[2] * s, o[2] * 0.4 * s, 0, 0, Math.PI * 2); g.fill();
-      g.beginPath(); g.moveTo(p.x - o[2] * 0.7 * s, p.y); g.lineTo(p.x, p.y + o[2] * 0.9 * s);
-      g.lineTo(p.x + o[2] * 0.7 * s, p.y); g.closePath(); g.fill();
+    // うかぶ しま と くも
+    g.fillStyle = "rgba(178,205,240,.5)";
+    [[0.13, 0.10, 0.075], [0.62, 0.06, 0.055], [0.88, 0.15, 0.06]].forEach(o => {
+      const x = o[0] * W, y = o[1] * H, r = o[2] * u;
+      g.beginPath(); g.ellipse(x, y, r, r * 0.4, 0, 0, Math.PI * 2); g.fill();
+      g.beginPath(); g.moveTo(x - r * 0.7, y); g.lineTo(x, y + r * 0.95); g.lineTo(x + r * 0.7, y);
+      g.closePath(); g.fill();
     });
-    // くも
-    g.fillStyle = "rgba(255,255,255,.85)";
-    [[60, 18, 1], [140, 12, .8]].forEach(o => {
-      const p = toScreen(o[0], o[1], s), u = 6 * s * o[2];
-      g.beginPath(); g.arc(p.x - u, p.y, u * .8, 0, Math.PI * 2);
-      g.arc(p.x, p.y - u * .35, u, 0, Math.PI * 2); g.arc(p.x + u, p.y + u * .1, u * .75, 0, Math.PI * 2); g.fill();
+    g.fillStyle = "rgba(255,255,255,.9)";
+    [[0.40, 0.09, 1], [0.80, 0.05, .75]].forEach(o => {
+      const x = o[0] * W, y = o[1] * H, r = u * 0.035 * o[2];
+      g.beginPath(); g.arc(x - r, y, r * .8, 0, Math.PI * 2);
+      g.arc(x, y - r * .35, r, 0, Math.PI * 2); g.arc(x + r, y + r * .1, r * .75, 0, Math.PI * 2); g.fill();
     });
 
-    // じめん
-    const gp = toScreen(0, GROUND, s);
-    g.fillStyle = "#c9ecff";
-    g.fillRect(0, gp.y - 6 * s, W, H - (gp.y - 6 * s));
-    g.fillStyle = "#d8f0a8";
-    g.beginPath();
-    g.moveTo(0, gp.y);
-    g.bezierCurveTo(W * .3, gp.y - 4 * s, W * .7, gp.y + 3 * s, W, gp.y - 2 * s);
-    g.lineTo(W, H); g.lineTo(0, H); g.closePath(); g.fill();
-    g.fillStyle = "#b6e08a";
-    g.beginPath();
-    g.moveTo(0, gp.y + 9 * s);
-    g.bezierCurveTo(W * .4, gp.y + 5 * s, W * .6, gp.y + 12 * s, W, gp.y + 7 * s);
-    g.lineTo(W, H); g.lineTo(0, H); g.closePath(); g.fill();
+    // じめん（てまえ ほど こく して おくゆき を だす）
+    const gr = g.createLinearGradient(0, hz, 0, H);
+    gr.addColorStop(0, "#dff3c2"); gr.addColorStop(0.45, "#cdeda4"); gr.addColorStop(1, "#a9d97f");
+    g.fillStyle = gr; g.fillRect(0, hz, W, H - hz);
+    g.fillStyle = "rgba(255,255,255,.4)";
+    g.beginPath(); g.ellipse(W * 0.5, hz, W * 0.62, (H - hz) * 0.12, 0, 0, Math.PI * 2); g.fill();
+    // ちらばる おはな（したほど おおきい ＝ とおきん ほう）
+    for (let i = 0; i < 14; i++) {
+      const fx = ((i * 37) % 100) / 100, fy = ((i * 53) % 100) / 100;
+      const y = hz + (H - hz) * (0.08 + fy * 0.9);
+      const dep = (y - hz) / (H - hz);
+      const r = u * (0.008 + dep * 0.018);
+      g.fillStyle = ["rgba(255,255,255,.75)", "rgba(255,214,236,.8)", "rgba(255,240,170,.8)"][i % 3];
+      g.beginPath(); g.ellipse(fx * W, y, r, r * 0.55, 0, 0, Math.PI * 2); g.fill();
+    }
 
-    // なげる うごき（0〜1）
+    // なげる うごき / ジャンプ / くち
     const thPh = (now - throwAnim);
     const th = (thPh >= -0.28 && thPh < 0.22) ? Math.max(0, 1 - Math.abs(thPh) / 0.28) : 0;
-    // ジャンプ（0〜1）
     const jPh = now - jump;
     const jm = (jPh >= 0 && jPh < 0.5) ? Math.sin((jPh / 0.5) * Math.PI) : 0;
-    // くちを あける（つぎの キャッチ が ちかづくと あく）
     let open = 0;
     if (running) for (const c of cues) {
       if (c.done || c.missed) continue;
       const d = c.t - now;
-      if (d >= -TOL && d < 0.45) { open = Math.max(open, 1 - Math.abs(d) / 0.45); }
+      if (d >= -TOL && d < 0.45) open = Math.max(open, 1 - Math.abs(d) / 0.45);
     }
 
-    // かげ
-    g.fillStyle = "rgba(90,120,80,.2)";
-    [[THROWER_X, 11], [CATCHER_X, 12]].forEach((o, i) => {
-      const p = toScreen(o[0], GROUND + 2, s);
-      const sh = i === 1 ? 1 - jm * 0.35 : 1;
-      g.beginPath(); g.ellipse(p.x, p.y, o[1] * s * sh, o[1] * 0.32 * s * sh, 0, 0, Math.PI * 2); g.fill();
-    });
+    // ねねちゃん（おく・ちいさい）
+    g.fillStyle = "rgba(90,120,80,.18)";
+    g.beginPath(); g.ellipse(TH.x * W, TH.y * H + u * 0.012, u * 0.062, u * 0.02, 0, 0, Math.PI * 2); g.fill();
+    drawNene(g, TH.x * W, TH.y * H - u * 0.05, u * 0.155, tt, th);
 
-    // キャラ
-    const chS = 26 * s;
-    const np = toScreen(THROWER_X, GROUND - 12, s);
-    drawNene(g, np.x, np.y, chS, tt, th);
-    const mp = toScreen(CATCHER_X, GROUND - 13, s);
-    drawMomo(g, mp.x, mp.y - jm * 13 * s, chS, tt, jm, open);
-
-    // とんでくる おはな
+    // とんでくる おはな（おく から てまえ へ。だんだん おおきく なる）
     if (running) {
+      const flying = [];
       for (const c of cues) {
-        const p = (now - (c.t - FLIGHT)) / FLIGHT;
         if (c.done) continue;
-        if (p < 0) continue;
+        const p = (now - (c.t - FLIGHT)) / FLIGHT;
+        if (p < 0 || p > 1.9) continue;
         if (p > 1 && (now - c.t) > TOL) c.missed = 1;
-        const pp = Math.min(p, 1.9);
-        const x = THROWER_X + (CATCHER_X - THROWER_X) * pp;
-        const arc = Math.sin(Math.min(pp, 1) * Math.PI) * 22;
-        const y = (GROUND - 14) - arc + (pp > 1 ? (pp - 1) * 60 : 0);
-        if (pp > 1.85) continue;
-        const sp = toScreen(x, y, s);
+        flying.push({ c: c, p: p });
+      }
+      flying.sort((a, b) => a.p - b.p);              // おくの ものから えがく
+      for (const f of flying) {
+        const p = f.p, q = Math.min(p, 1);
+        const x = lerp(D0.x, D1.x, p) * W;
+        const y = lerp(D0.y, D1.y, p) * H - Math.sin(q * Math.PI) * H * 0.085
+                  + (p > 1 ? (p - 1) * H * 0.5 : 0);
+        const r = u * lerp(0.028, 0.085, q);
         // かげ
-        const sh = toScreen(x, GROUND + 1, s);
-        g.fillStyle = "rgba(90,120,80,.16)";
-        g.beginPath(); g.ellipse(sh.x, sh.y, 5 * s, 1.7 * s, 0, 0, Math.PI * 2); g.fill();
-        g.globalAlpha = c.missed ? 0.5 : 1;
-        drawFlowerDisc(g, sp.x, sp.y, 7 * s, now * 7, 0.55);
+        const sy = lerp(D0.y + 0.055, D1.y + 0.13, q) * H;
+        g.fillStyle = "rgba(90,120,80,.15)";
+        g.beginPath(); g.ellipse(x, Math.min(sy, H), r * 0.85, r * 0.3, 0, 0, Math.PI * 2); g.fill();
+        g.globalAlpha = f.c.missed ? 0.45 : 1;
+        drawFlowerDisc(g, x, y, r, now * 6 + p * 3, 0.62);
         g.globalAlpha = 1;
       }
       progIn.style.width = Math.max(0, Math.min(100, now / songLen * 100)) + "%";
     }
+
+    // ももちゃん（てまえ・おおきい）
+    g.fillStyle = "rgba(90,120,80,.22)";
+    const csh = 1 - jm * 0.3;
+    g.beginPath(); g.ellipse(CA.x * W, CA.y * H + u * 0.015, u * 0.11 * csh, u * 0.034 * csh, 0, 0, Math.PI * 2); g.fill();
+    drawMomo(g, CA.x * W, CA.y * H - u * 0.10 - jm * u * 0.09, u * 0.30, tt, jm, open);
 
     // ほめことば
     pops = pops.filter(p => tt - p.t < 800);
     g.textAlign = "center"; g.textBaseline = "middle";
     for (const p of pops) {
       const a = 1 - (tt - p.t) / 800;
-      const q = toScreen(CATCHER_X, GROUND - 42, s);
       g.globalAlpha = a;
-      g.font = "900 " + (7 * s) + "px " + FONT;
-      g.lineWidth = 1.6 * s; g.strokeStyle = "#fff"; g.lineJoin = "round";
-      g.strokeText(p.txt, q.x, q.y - (1 - a) * 20);
-      g.fillStyle = "#e0518c"; g.fillText(p.txt, q.x, q.y - (1 - a) * 20);
+      g.font = "900 " + (u * 0.075) + "px " + FONT;
+      g.lineWidth = u * 0.016; g.strokeStyle = "#fff"; g.lineJoin = "round";
+      const px = CA.x * W, py = CA.y * H - u * 0.34 - (1 - a) * u * 0.05;
+      g.strokeText(p.txt, px, py); g.fillStyle = "#e0518c"; g.fillText(p.txt, px, py);
       g.globalAlpha = 1;
     }
     for (let i = parts.length - 1; i >= 0; i--) {
